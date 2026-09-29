@@ -1452,6 +1452,11 @@ export default function DashboardView({
         onClose={() => setIsAdminPanelOpen(false)}
         currentUserRole={activeRole}
         currentUserEmail={userEmail}
+        scenarios={scenarios}
+        activeScenarioId={activeScenarioId}
+        onSaveScenario={handleSaveScenario}
+        onDeleteScenario={handleDeleteScenario}
+        onSelectScenario={(scId) => setActiveScenarioId(scId)}
       />
 
       {/* Modal Gestor de Escenarios Dinámicos */}
