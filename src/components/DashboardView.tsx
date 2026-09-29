@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import type { SystemParameters, FareCategory, AuditLog, UserRole } from '@/types/database';
+import type { ScenarioConfig } from '@/types/scenario';
 import { updateSystemParameter } from '@/actions/parameters';
 import { createClient } from '@/lib/supabase/client';
 import type { UpdateParameterInput } from '@/lib/validations/parameters';
 import AuthModal from '@/components/AuthModal';
 import AdminUsersPanel from '@/components/AdminUsersPanel';
+import LandingPage from '@/components/LandingPage';
+import ScenarioManagerModal from '@/components/ScenarioManagerModal';
 
 interface DashboardViewProps {
   initialParameters: SystemParameters;
@@ -17,8 +20,62 @@ interface DashboardViewProps {
 }
 
 type EditableParameterField = UpdateParameterInput['field'];
-type ScenarioType = 'social2' | 'social1' | 'technical' | 'current' | 'stress';
 type TabType = 'resumen' | 'tarifas' | 'rutas' | 'auditoria';
+
+const defaultScenarios: ScenarioConfig[] = [
+  {
+    id: 'social2',
+    label: 'Social 2 (Bs. 3,50)',
+    badge: 'RECOMENDADO',
+    adultFare: 3.50,
+    socialFares: { adultos: 3.50, adultosMayores: 2.50, universitarios: 2.00, colegiales: 1.50, escolares: 1.50, discapacidad: 0 },
+    demandFactor: 1.0,
+    fuelPriceFactor: 1.0,
+    color: 'text-emerald-700 font-extrabold',
+    isCustom: false
+  },
+  {
+    id: 'social1',
+    label: 'Social 1 (Bs. 3,80)',
+    adultFare: 3.80,
+    socialFares: { adultos: 3.80, adultosMayores: 3.00, universitarios: 2.00, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
+    demandFactor: 1.0,
+    fuelPriceFactor: 1.0,
+    color: 'text-slate-700',
+    isCustom: false
+  },
+  {
+    id: 'technical',
+    label: 'Técnica (Bs. 3,45)',
+    badge: 'EQUILIBRIO',
+    adultFare: 3.4485,
+    socialFares: { adultos: 3.4485, adultosMayores: 2.6822, universitarios: 1.9158, colegiales: 1.1495, escolares: 0.7663, discapacidad: 0 },
+    demandFactor: 1.0,
+    fuelPriceFactor: 1.0,
+    color: 'text-blue-700',
+    isCustom: false
+  },
+  {
+    id: 'current',
+    label: 'Vigente (Bs. 4,50)',
+    adultFare: 4.50,
+    socialFares: { adultos: 4.50, adultosMayores: 3.50, universitarios: 2.50, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
+    demandFactor: 1.0,
+    fuelPriceFactor: 1.0,
+    color: 'text-slate-700',
+    isCustom: false
+  },
+  {
+    id: 'stress',
+    label: 'Estrés (-10% / +15%)',
+    adultFare: 4.50,
+    socialFares: { adultos: 4.50, adultosMayores: 3.50, universitarios: 2.50, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
+    demandFactor: 0.90,
+    fuelPriceFactor: 1.15,
+    color: 'text-amber-700',
+    isCustom: false
+  }
+];
 
 export default function DashboardView({
   initialParameters,
@@ -28,12 +85,19 @@ export default function DashboardView({
   currentUserEmail = 'consultor@ecotraffic.com.bo'
 }: DashboardViewProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const [viewMode, setViewMode] = useState<'landing' | 'dashboard'>('dashboard');
   const [activeTab, setActiveTab] = useState<TabType>('resumen');
+  
+  // Parámetros, Tarifas y Bitácora
   const [params, setParams] = useState<SystemParameters>(initialParameters);
   const [fares, setFares] = useState<FareCategory[]>(initialFares);
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs);
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioType>('social2');
   
+  // Escenarios Dinámicos
+  const [scenarios, setScenarios] = useState<ScenarioConfig[]>(defaultScenarios);
+  const [activeScenarioId, setActiveScenarioId] = useState<string>('social2');
+  const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
+
   // Estado de Usuario y Sesión
   const [activeRole, setActiveRole] = useState<UserRole>(currentRole);
   const [userEmail, setUserEmail] = useState<string>(currentUserEmail);
@@ -146,17 +210,20 @@ export default function DashboardView({
     });
   };
 
-  // Cálculos de economía del sistema
+  // Escenario Activo
+  const activeScenario = scenarios.find(s => s.id === activeScenarioId) || scenarios[0];
+
+  // Cálculos de economía del sistema con factores del escenario activo
   const days = params.operating_days_month;
   const turns = params.turns_day;
   const fleet = params.fleet_active;
   const kmDay = params.km_network_day;
-  const demandDay = selectedScenario === 'stress' ? params.demand_network_day * 0.9 : params.demand_network_day;
-  const dieselPrice = selectedScenario === 'stress' ? params.fuel_price_bs_l * 1.15 : params.fuel_price_bs_l;
+  const demandDay = params.demand_network_day * activeScenario.demandFactor;
+  const dieselPrice = params.fuel_price_bs_l * activeScenario.fuelPriceFactor;
 
-  const unitKm = (kmDay / fleet) * days; // 2172.59 km/mes
-  const unitPax = (demandDay / fleet) * days; // 6995.74 pax/mes
-  const ipk = demandDay / kmDay; // 3.22 pax/km
+  const unitKm = (kmDay / fleet) * days;
+  const unitPax = (demandDay / fleet) * days;
+  const ipk = demandDay / kmDay;
 
   const fuelCost = (unitKm / params.fuel_efficiency_km_l) * dieselPrice * (1 + params.idle_congestion_factor);
   const maintVar = params.maintenance_monthly_bs * params.maintenance_var_share;
@@ -169,32 +236,28 @@ export default function DashboardView({
   const allowedReturn = (params.vehicle_replacement_value_bs - params.vehicle_residual_value_bs) * (params.capital_return_rate_annual / 12);
   const regulatoryCost = opex + depreciation + allowedReturn;
   const technicalWeighted = regulatoryCost / unitPax;
-
-  // Ponderaciones de tarifa
   const currentWeighted = fares.reduce((acc, f) => acc + f.demand_share * f.fare_current_bs, 0);
-  const social1Weighted = fares.reduce((acc, f) => acc + f.demand_share * f.fare_social_1_bs, 0);
-  const social2Weighted = fares.reduce((acc, f) => acc + f.demand_share * f.fare_social_2_bs, 0);
 
-  let activeAdultFare = 3.50;
-  let activeWeightedFare = social2Weighted;
+  // Ponderaciones de tarifa del escenario activo
 
-  if (selectedScenario === 'social2') {
-    activeAdultFare = 3.50;
-    activeWeightedFare = social2Weighted;
-  } else if (selectedScenario === 'social1') {
-    activeAdultFare = 3.80;
-    activeWeightedFare = social1Weighted;
-  } else if (selectedScenario === 'technical') {
-    activeAdultFare = technicalWeighted * (fares[0]?.fare_current_bs / currentWeighted);
-    activeWeightedFare = technicalWeighted;
-  } else if (selectedScenario === 'current') {
-    activeAdultFare = 4.50;
-    activeWeightedFare = currentWeighted;
-  } else if (selectedScenario === 'stress') {
-    activeAdultFare = 4.50;
-    activeWeightedFare = currentWeighted;
-  }
+  const activeWeightedFare = fares.reduce((acc, f) => {
+    let categoryFare = f.fare_social_2_bs;
+    if (activeScenarioId === 'social1') categoryFare = f.fare_social_1_bs;
+    else if (activeScenarioId === 'social2') categoryFare = f.fare_social_2_bs;
+    else if (activeScenarioId === 'technical') categoryFare = f.fare_technical_bs;
+    else if (activeScenarioId === 'current' || activeScenarioId === 'stress') categoryFare = f.fare_current_bs;
+    else if (activeScenario.isCustom) {
+      if (f.name.includes('Adultos mayores')) categoryFare = activeScenario.socialFares.adultosMayores;
+      else if (f.name.includes('Universitarios')) categoryFare = activeScenario.socialFares.universitarios;
+      else if (f.name.includes('Colegiales')) categoryFare = activeScenario.socialFares.colegiales;
+      else if (f.name.includes('Escolares')) categoryFare = activeScenario.socialFares.escolares;
+      else if (f.name.includes('Discapacidad')) categoryFare = 0;
+      else categoryFare = activeScenario.adultFare;
+    }
+    return acc + f.demand_share * categoryFare;
+  }, 0);
 
+  const activeAdultFare = activeScenario.adultFare;
   const monthlyRevenue = activeWeightedFare * unitPax;
   const freeCash = monthlyRevenue - opex - depreciation;
   const economicProfit = monthlyRevenue - regulatoryCost;
@@ -261,24 +324,113 @@ export default function DashboardView({
 
   const deficitRoutesCount = calculatedRoutes.filter(r => r.isDeficit).length;
 
-  // Descarga del Archivo Excel Maestro Oficial
-  const handleExportExcel = () => {
+  // =========================================================================
+  // EXPORTACIÓN DINÁMICA A EXCEL CON VALORES MODIFICADOS EN VIVO
+  // =========================================================================
+  const handleExportDynamicExcel = () => {
     try {
-      // Descarga directa del archivo maestro alojado en /public
-      const link = document.createElement('a');
-      link.href = '/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx';
-      link.download = `Modelo_Oficial_Tarifario_Sucre_${selectedScenario}_v3.3.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch {
-      window.open("/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx", "_blank");
-    }
-  };
+      const XLSX = window.XLSX;
+      if (XLSX) {
+        const wb = XLSX.utils.book_new();
 
-  // Manejo de exportación a PDF (Dossier Oficial)
-  const handleExportPDF = () => {
-    window.print();
+        // Hoja 1: Resumen Ejecutivo y Parámetros Calibrados en Vivo
+        const summaryData = [
+          ["SISTEMA DE GOBERNANZA TARIFARIA SUCRE v3.3 — GAM SUCRE & ECOTRAFFIC"],
+          ["DIRECCIÓN DE TRÁFICO, TRANSPORTE Y VIALIDAD"],
+          ["Escenario Activo Exportado", activeScenario.label],
+          ["Fecha y Hora de Exportación", new Date().toLocaleString('es-BO')],
+          [],
+          ["INDICADOR ECONÓMICO", "VALOR AUDITADO", "UNIDAD DE MEDIDA", "OBSERVACIÓN"],
+          ["Tarifa Adulto Oficial", activeAdultFare, "Bs / viaje", "+3,9% s/ técnica de equilibrio"],
+          ["Tarifa Técnica de Equilibrio", 3.4485, "Bs / viaje", "Equilibrio financiero WACC 11%"],
+          ["Tarifa Ponderada de Red", activeWeightedFare, "Bs / viaje", `Ponderada según matriz social`],
+          ["Ingreso Mensual del Hogar del Operador", Math.round(householdIncome), "Bs / mes", "Salario conductor + Retorno de capital"],
+          ["Utilidad Excedente Mensual", Math.round(economicProfit), "Bs / mes", "Margen neto sobre costo regulatorio"],
+          ["OPEX Efectivo Mensual por Unidad", opex, "Bs / mes", "Combustible + Mantenimiento + Personal + Fijos"],
+          ["Reserva de Reposición Vehicular (10 años)", depreciation, "Bs / mes", "Depreciación lineal"],
+          ["Retorno Justo al Capital (WACC 11% Anual)", allowedReturn, "Bs / mes", "Tasa regulatoria estándar"],
+          ["COSTO ECONÓMICO REGULATORIO TOTAL", regulatoryCost, "Bs / mes", "Costo unitario mensual completo"],
+          [],
+          ["PARÁMETRO OPERATIVO", "VALOR EN SIMULADOR", "UNIDAD", "ESTADO"],
+          ["Precio del Diésel", dieselPrice, "Bs / litro", "Con factor de escenario"],
+          ["Rendimiento Diésel Base", params.fuel_efficiency_km_l, "km / litro", "+15% factor de congestión/ralentí"],
+          ["Mantenimiento Mensual v2", params.maintenance_monthly_bs, "Bs / mes", "-32,7% Planilla técnica 52 ítems"],
+          ["Salario Conductor Profesional", params.driver_salary_bs, "Bs / mes", "+8,33% previsión aguinaldo"],
+          ["Flota Activa en Servicio", fleet, "microbuses", "Flota relevada en campo"],
+          ["Demanda Diaria Total de Red", demandDay, "pasajeros / día", "Con factor de elasticidad"],
+          ["Producción Diaria de Red (GPS)", kmDay, "km / día", "Medición satelital conciliada"]
+        ];
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen_Economico");
+
+        // Hoja 2: Matriz Tarifaria por Categoría Social
+        const faresData = [
+          ["Categoría Social", "% Demanda", "Viajes / Día", "Tarifa Vigente (Bs)", "Tarifa Técnica (Bs)", "Tarifa Escenario Activo (Bs)", "Recaudación Mensual Estimada (Bs)"],
+          ...fares.map(f => {
+            let catFare = f.fare_social_2_bs;
+            if (activeScenarioId === 'social1') catFare = f.fare_social_1_bs;
+            else if (activeScenarioId === 'social2') catFare = f.fare_social_2_bs;
+            else if (activeScenarioId === 'technical') catFare = f.fare_technical_bs;
+            else if (activeScenarioId === 'current') catFare = f.fare_current_bs;
+            else if (activeScenario.isCustom) catFare = activeScenario.adultFare;
+            return [
+              f.name,
+              f.demand_share,
+              f.daily_trips,
+              f.fare_current_bs,
+              f.fare_technical_bs,
+              catFare,
+              f.daily_trips * catFare * days
+            ];
+          })
+        ];
+        const wsFares = XLSX.utils.aoa_to_sheet(faresData);
+        XLSX.utils.book_append_sheet(wb, wsFares, "Matriz_Tarifaria");
+
+        // Hoja 3: Análisis de las 32 Rutas Urbanas
+        const routesData = [
+          ["ID", "Sindicato", "Línea de Transporte", "Distancia Ciclo (km)", "Flota Asignada", "km / Mes", "Pasajeros / Mes", "Recaudación (Bs)", "Costo Regulatorio (Bs)", "Utilidad Excedente (Bs)", "Estado de Ruta"],
+          ...calculatedRoutes.map(r => [
+            r.id,
+            r.union,
+            r.line,
+            r.distance,
+            r.fleet,
+            Math.round(r.kmMes),
+            Math.round(r.paxMes),
+            Math.round(r.routeRev),
+            Math.round(r.routeReg),
+            Math.round(r.routeProfit),
+            r.isDeficit ? "DÉFICIT" : "EQUILIBRIO / CUBRE"
+          ])
+        ];
+        const wsRoutes = XLSX.utils.aoa_to_sheet(routesData);
+        XLSX.utils.book_append_sheet(wb, wsRoutes, "32_Rutas_Rentabilidad");
+
+        // Hoja 4: Bitácora Inmutable de Auditoría
+        const auditData = [
+          ["Fecha y Hora", "Usuario", "Rol", "Organización", "Acción", "Parámetro / Entidad", "Justificación Técnica Registrada"],
+          ...logs.map(l => [
+            new Date(l.created_at).toLocaleString('es-BO'),
+            l.user_email,
+            l.user_role,
+            l.user_organization,
+            l.action,
+            l.field_name || l.entity_name,
+            l.justification
+          ])
+        ];
+        const wsAudit = XLSX.utils.aoa_to_sheet(auditData);
+        XLSX.utils.book_append_sheet(wb, wsAudit, "Bitacora_Auditoria");
+
+        XLSX.writeFile(wb, `SIM-PRO_Tarifario_Sucre_${activeScenario.id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      } else {
+        // Fallback a descarga del archivo maestro
+        window.open('/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx', '_blank');
+      }
+    } catch {
+      window.open('/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx', '_blank');
+    }
   };
 
   const handleOpenEdit = (field: EditableParameterField, currentValue: number) => {
@@ -337,11 +489,61 @@ export default function DashboardView({
     }
   };
 
+  const handleSaveScenario = (sc: ScenarioConfig) => {
+    setScenarios(prev => {
+      const exists = prev.some(item => item.id === sc.id);
+      if (exists) {
+        return prev.map(item => item.id === sc.id ? sc : item);
+      }
+      return [...prev, sc];
+    });
+    setActiveScenarioId(sc.id);
+    setStatusMessage({ text: `Escenario '${sc.label}' guardado y activado exitosamente.`, type: 'success' });
+  };
+
+  const handleDeleteScenario = (scId: string) => {
+    setScenarios(prev => prev.filter(item => item.id !== scId));
+    if (activeScenarioId === scId) {
+      setActiveScenarioId('social2');
+    }
+    setStatusMessage({ text: 'Escenario eliminado.', type: 'success' });
+  };
+
+  const handleLogout = () => {
+    setViewMode('landing');
+  };
+
+  // Si está en modo Landing Page
+  if (viewMode === 'landing') {
+    return (
+      <>
+        <LandingPage
+          onEnterSystem={() => setViewMode('dashboard')}
+          onOpenLogin={() => setIsAuthModalOpen(true)}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={(email, role, org) => {
+            setUserEmail(email);
+            setActiveRole(role);
+            setUserOrg(org);
+            setViewMode('dashboard');
+            setStatusMessage({ text: `Sesión iniciada como ${role} (${email})`, type: 'success' });
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-900/5 text-slate-900 font-sans">
+      
+      {/* Script SheetJS para exportación Excel dinámico */}
+      <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
       {/* ========================================================================= */}
-      {/* 🖥️ INTERFAZ DE PANTALLA COMPLETA (OCULTA AUTOMÁTICAMENTE AL IMPRIMIR PDF)  */}
+      {/* 🖥️ INTERFAZ DEL DASHBOARD (OCULTA AUTOMÁTICAMENTE AL IMPRIMIR PDF)        */}
       {/* ========================================================================= */}
       <div className="print:hidden pb-16">
         
@@ -349,11 +551,15 @@ export default function DashboardView({
         <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 shadow-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
             
-            {/* Branding & Identidad Oficial */}
+            {/* Branding & Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center font-black text-white text-base shadow-md">
+              <button 
+                onClick={() => setViewMode('landing')}
+                className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center font-black text-white text-base shadow-md hover:scale-105 transition-all"
+                title="Volver a la Portada Institucional"
+              >
                 S
-              </div>
+              </button>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm tracking-tight text-white">
@@ -372,7 +578,7 @@ export default function DashboardView({
               </div>
             </div>
 
-            {/* Desktop Quick Actions */}
+            {/* Desktop Action Buttons */}
             <div className="hidden lg:flex items-center gap-2.5">
               
               {/* Indicador de Estado Realtime */}
@@ -391,9 +597,9 @@ export default function DashboardView({
 
               {/* Botón Descargar PDF Oficial */}
               <button
-                onClick={handleExportPDF}
+                onClick={() => window.print()}
                 className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
-                title="Imprimir o Descargar Dossier PDF Oficial Formateado"
+                title="Descargar Dossier PDF Oficial Formateado"
               >
                 <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
@@ -401,16 +607,16 @@ export default function DashboardView({
                 <span>Reporte PDF</span>
               </button>
 
-              {/* Botón Descargar Excel Maestro Oficial */}
+              {/* Botón Descargar Excel Dinámico */}
               <button
-                onClick={handleExportExcel}
+                onClick={handleExportDynamicExcel}
                 className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-600/70 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
-                title="Descargar Planilla Maestra Completa de Ecotraffic (.xlsx)"
+                title="Descargar Excel con todas las modificaciones actuales del simulador"
               >
                 <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
-                <span>Excel Maestro .xlsx</span>
+                <span>Excel Dinámico .xlsx</span>
               </button>
 
               {/* Botón SuperAdmin Panel */}
@@ -423,7 +629,7 @@ export default function DashboardView({
                 </button>
               )}
 
-              {/* Selector de Rol Dinámico */}
+              {/* Selector de Rol */}
               <div className="relative">
                 <select
                   value={activeRole}
@@ -448,16 +654,17 @@ export default function DashboardView({
                 </select>
               </div>
 
-              {/* Botón de Autenticación / Perfil */}
+              {/* Botón Cerrar Sesión */}
               <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+                onClick={handleLogout}
+                className="bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold px-3 py-1.5 rounded-xl transition-all active:scale-95"
+                title="Cerrar sesión y volver a la portada"
               >
-                <span>{userEmail ? userEmail.split('@')[0] : 'Iniciar Sesión'}</span>
+                Cerrar Sesión
               </button>
             </div>
 
-            {/* Mobile Hamburger Menu Toggle */}
+            {/* Mobile Hamburger Toggle */}
             <div className="flex lg:hidden items-center gap-2">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -471,17 +678,17 @@ export default function DashboardView({
 
           </div>
 
-          {/* Mobile Drawer Dropdown */}
+          {/* Mobile Drawer Menu */}
           {isMobileMenuOpen && (
             <div className="lg:hidden bg-slate-950 border-b border-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
-                <span className="text-slate-400">Usuario activo:</span>
+                <span className="text-slate-400">Usuario:</span>
                 <span className="font-mono text-blue-300 font-bold">{userEmail}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => { handleExportPDF(); setIsMobileMenuOpen(false); }}
+                  onClick={() => { window.print(); setIsMobileMenuOpen(false); }}
                   className="p-2.5 bg-slate-800 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5"
                 >
                   <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -491,15 +698,22 @@ export default function DashboardView({
                 </button>
 
                 <button
-                  onClick={() => { handleExportExcel(); setIsMobileMenuOpen(false); }}
+                  onClick={() => { handleExportDynamicExcel(); setIsMobileMenuOpen(false); }}
                   className="p-2.5 bg-emerald-950 rounded-xl text-xs font-bold text-emerald-200 border border-emerald-600/60 flex items-center justify-center gap-1.5"
                 >
                   <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                   </svg>
-                  <span>Excel Maestro</span>
+                  <span>Excel Dinámico</span>
                 </button>
               </div>
+
+              <button
+                onClick={() => { setIsScenarioModalOpen(true); setIsMobileMenuOpen(false); }}
+                className="w-full py-2.5 bg-indigo-600/30 text-indigo-200 font-bold text-xs rounded-xl border border-indigo-500/40 text-center"
+              >
+                ⚡ Gestionar y Crear Escenarios
+              </button>
 
               {isSuperAdmin && (
                 <button
@@ -511,19 +725,19 @@ export default function DashboardView({
               )}
 
               <button
-                onClick={() => { setIsAuthModalOpen(true); setIsMobileMenuOpen(false); }}
-                className="w-full py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl text-center"
+                onClick={() => { setViewMode('landing'); setIsMobileMenuOpen(false); }}
+                className="w-full py-2.5 bg-rose-600 text-white font-bold text-xs rounded-xl text-center"
               >
-                Cambiar de Cuenta / Iniciar Sesión
+                Cerrar Sesión (Ir a Portada)
               </button>
             </div>
           )}
         </header>
 
-        {/* Main SaaS Workspace */}
+        {/* Main Workspace */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
           
-          {/* Banner de Retroalimentación */}
+          {/* Banner de Feedback */}
           {statusMessage && (
             <div className={`p-4 rounded-2xl text-xs font-semibold flex items-center justify-between border shadow-sm ${
               statusMessage.type === 'success' 
@@ -535,7 +749,7 @@ export default function DashboardView({
             </div>
           )}
 
-          {/* Header de Negociación y Escenarios SaaS */}
+          {/* Header de Escenarios Dinámicos */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -550,36 +764,41 @@ export default function DashboardView({
               </h2>
             </div>
 
-            {/* Segmented Control de Escenarios */}
-            <div className="bg-slate-100 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-slate-200/80 w-full md:w-auto">
-              {[
-                { id: 'social2' as const, label: 'Social 2 (Bs. 3,50)', badge: 'RECOMENDADO', color: 'text-emerald-700 font-extrabold' },
-                { id: 'social1' as const, label: 'Social 1 (Bs. 3,80)', badge: '', color: 'text-slate-700' },
-                { id: 'technical' as const, label: 'Técnica (Bs. 3,45)', badge: 'EQUILIBRIO', color: 'text-blue-700' },
-                { id: 'current' as const, label: 'Vigente (Bs. 4,50)', badge: '', color: 'text-slate-700' },
-                { id: 'stress' as const, label: 'Estrés (-10% / +15%)', badge: '', color: 'text-amber-700' }
-              ].map(sc => (
-                <button
-                  key={sc.id}
-                  onClick={() => setSelectedScenario(sc.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                    selectedScenario === sc.id
-                      ? 'bg-white text-slate-950 shadow-sm border border-slate-200/80 font-bold'
-                      : 'text-slate-600 hover:text-slate-950 hover:bg-slate-200/60'
-                  }`}
-                >
-                  <span className={sc.color}>{sc.label}</span>
-                  {sc.badge && (
-                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold">
-                      {sc.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
+            {/* Controles de Escenarios */}
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <div className="bg-slate-100 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-slate-200/80 flex-1 md:flex-initial">
+                {scenarios.map(sc => (
+                  <button
+                    key={sc.id}
+                    onClick={() => setActiveScenarioId(sc.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                      activeScenarioId === sc.id
+                        ? 'bg-white text-slate-950 shadow-sm border border-slate-200/80 font-bold'
+                        : 'text-slate-600 hover:text-slate-950 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    <span className={sc.color || 'text-slate-700'}>{sc.label}</span>
+                    {sc.badge && (
+                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold">
+                        {sc.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Botón Abrir Gestor de Escenarios */}
+              <button
+                onClick={() => setIsScenarioModalOpen(true)}
+                className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-2xl flex items-center gap-1 transition-all active:scale-95"
+                title="Crear, editar o eliminar escenarios"
+              >
+                <span>⚙️ Gestionar Escenarios</span>
+              </button>
             </div>
           </div>
 
-          {/* Métricas Principales (6 SaaS Metric Cards) */}
+          {/* 6 SaaS Metric Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
             {/* Card 1: Tarifa Adulto */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
@@ -661,7 +880,7 @@ export default function DashboardView({
                 ℹ
               </div>
               <div className="text-xs text-slate-800 leading-relaxed font-medium">
-                <strong>Diagnóstico Técnico Oficial:</strong> Con la tarifa <strong>Social 2 (Bs. 3,50)</strong>, el microbús recauda <strong>Bs. {fmt(monthlyRevenue, 0)}/mes</strong>, cubriendo el 100% del costo regulatorio (Bs. {fmt(regulatoryCost, 0)}/mes), asegurando la reposición de la flota y generando un ingreso digno de <strong>Bs. {fmt(householdIncome, 0)}/mes</strong> para la familia del operador.
+                <strong>Diagnóstico Técnico ({activeScenario.label}):</strong> Con la tarifa propuesta de <strong>Bs. {fmt(activeAdultFare, 2)}</strong>, el microbús recauda <strong>Bs. {fmt(monthlyRevenue, 0)}/mes</strong>, cubriendo el 100% del costo regulatorio (Bs. {fmt(regulatoryCost, 0)}/mes), asegurando la reposición de la flota y generando un ingreso digno de <strong>Bs. {fmt(householdIncome, 0)}/mes</strong> para la familia del operador.
               </div>
             </div>
             <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap hidden lg:block">
@@ -710,7 +929,7 @@ export default function DashboardView({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {[
-                    { key: 'fuel_price_bs_l' as const, label: 'Precio Diésel', val: params.fuel_price_bs_l, unit: 'Bs/litro' },
+                    { key: 'fuel_price_bs_l' as const, label: 'Precio Diésel Base', val: params.fuel_price_bs_l, unit: 'Bs/litro' },
                     { key: 'fuel_efficiency_km_l' as const, label: 'Rendimiento Diésel Base', val: params.fuel_efficiency_km_l, unit: 'km/l (+15% ralentí)' },
                     { key: 'maintenance_monthly_bs' as const, label: 'Mantenimiento Mensual v2', val: params.maintenance_monthly_bs, unit: 'Bs/mes (-32,7%)' },
                     { key: 'driver_salary_bs' as const, label: 'Salario Chofer Profesional', val: params.driver_salary_bs, unit: 'Bs/mes (+8,33% aguinaldo)' },
@@ -799,7 +1018,7 @@ export default function DashboardView({
             <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Matriz de Tarifas por Categoría Social</h3>
-                <p className="text-[11px] text-slate-500">Comparación de recaudación y subsidios cruzados por tipo de pasajero</p>
+                <p className="text-[11px] text-slate-500">Comparación de recaudación bajo el escenario activo: <strong>{activeScenario.label}</strong></p>
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -811,43 +1030,56 @@ export default function DashboardView({
                       <th className="p-3 text-right">Viajes / Día</th>
                       <th className="p-3 text-right">Vigente (Bs)</th>
                       <th className="p-3 text-right">Técnica Eq. (Bs)</th>
-                      <th className="p-3 text-right">Social 1 (Bs)</th>
-                      <th className="p-3 text-right bg-emerald-50 text-emerald-900">Social 2 (Bs. 3,50)</th>
-                      <th className="p-3 text-right">Dif. Soc2 - Téc</th>
+                      <th className="p-3 text-right bg-emerald-50 text-emerald-900">Escenario Activo (Bs)</th>
+                      <th className="p-3 text-right">Dif. s/ Técnica</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {fares.map(f => (
-                      <tr key={f.name} className="hover:bg-slate-50/80">
-                        <td className="p-3 font-semibold text-slate-900">{f.name}</td>
-                        <td className="p-3 text-right font-mono">{fmt(f.demand_share * 100, 1)}%</td>
-                        <td className="p-3 text-right font-mono">{fmt(f.daily_trips, 0)}</td>
-                        <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
-                        <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
-                        <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_social_1_bs, 2)}</td>
-                        <td className="p-3 text-right font-mono font-bold bg-emerald-50/50 text-emerald-900">
-                          Bs. {fmt(f.fare_social_2_bs, 2)}
-                        </td>
-                        <td className={`p-3 text-right font-mono font-semibold ${
-                          f.fare_social_2_bs - f.fare_technical_bs >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                        }`}>
-                          {f.fare_social_2_bs - f.fare_technical_bs >= 0 ? '+' : ''}
-                          {fmt(f.fare_social_2_bs - f.fare_technical_bs, 4)}
-                        </td>
-                      </tr>
-                    ))}
+                    {fares.map(f => {
+                      let activeCatFare = f.fare_social_2_bs;
+                      if (activeScenarioId === 'social1') activeCatFare = f.fare_social_1_bs;
+                      else if (activeScenarioId === 'social2') activeCatFare = f.fare_social_2_bs;
+                      else if (activeScenarioId === 'technical') activeCatFare = f.fare_technical_bs;
+                      else if (activeScenarioId === 'current') activeCatFare = f.fare_current_bs;
+                      else if (activeScenario.isCustom) {
+                        if (f.name.includes('Adultos mayores')) activeCatFare = activeScenario.socialFares.adultosMayores;
+                        else if (f.name.includes('Universitarios')) activeCatFare = activeScenario.socialFares.universitarios;
+                        else if (f.name.includes('Colegiales')) activeCatFare = activeScenario.socialFares.colegiales;
+                        else if (f.name.includes('Escolares')) activeCatFare = activeScenario.socialFares.escolares;
+                        else if (f.name.includes('Discapacidad')) activeCatFare = 0;
+                        else activeCatFare = activeScenario.adultFare;
+                      }
+
+                      return (
+                        <tr key={f.name} className="hover:bg-slate-50/80">
+                          <td className="p-3 font-semibold text-slate-900">{f.name}</td>
+                          <td className="p-3 text-right font-mono">{fmt(f.demand_share * 100, 1)}%</td>
+                          <td className="p-3 text-right font-mono">{fmt(f.daily_trips, 0)}</td>
+                          <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
+                          <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
+                          <td className="p-3 text-right font-mono font-bold bg-emerald-50/50 text-emerald-900">
+                            Bs. {fmt(activeCatFare, 2)}
+                          </td>
+                          <td className={`p-3 text-right font-mono font-semibold ${
+                            activeCatFare - f.fare_technical_bs >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                          }`}>
+                            {activeCatFare - f.fare_technical_bs >= 0 ? '+' : ''}
+                            {fmt(activeCatFare - f.fare_technical_bs, 4)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300">
                       <td className="p-3">PROMEDIO PONDERADO</td>
                       <td className="p-3 text-right">100.0%</td>
                       <td className="p-3 text-right">{fmt(demandDay, 0)}</td>
                       <td className="p-3 text-right">Bs. {fmt(currentWeighted, 4)}</td>
                       <td className="p-3 text-right">Bs. {fmt(technicalWeighted, 4)}</td>
-                      <td className="p-3 text-right">Bs. {fmt(social1Weighted, 4)}</td>
                       <td className="p-3 text-right bg-emerald-100 text-emerald-950 font-black">
-                        Bs. {fmt(social2Weighted, 4)}
+                        Bs. {fmt(activeWeightedFare, 4)}
                       </td>
                       <td className="p-3 text-right text-emerald-700 font-black">
-                        +{fmt(social2Weighted - technicalWeighted, 4)}
+                        +{fmt(activeWeightedFare - technicalWeighted, 4)}
                       </td>
                     </tr>
                   </tbody>
@@ -863,7 +1095,7 @@ export default function DashboardView({
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Rentabilidad de las 32 Rutas Urbanas</h3>
                   <p className="text-[11px] text-slate-500">
-                    Conciliación de red (Factor: 1,0050) bajo el escenario activo <strong>{selectedScenario}</strong>
+                    Conciliación de red (Factor: 1,0050) bajo el escenario activo <strong>{activeScenario.label}</strong>
                   </p>
                 </div>
                 <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold">
@@ -998,7 +1230,7 @@ export default function DashboardView({
             <h1 className="text-xl font-black text-slate-950">GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE</h1>
             <p className="text-xs text-slate-700 font-bold uppercase tracking-tight">DIRECCIÓN DE TRÁFICO, TRANSPORTE Y VIALIDAD</p>
             <p className="text-sm font-black text-blue-950 mt-2">
-              DOSSIER TÉCNICO OFICIAL DE GOBERNANZA TARIFARIA — ESCENARIO {selectedScenario.toUpperCase()}
+              DOSSIER TÉCNICO OFICIAL DE GOBERNANZA TARIFARIA — ESCENARIO {activeScenario.label.toUpperCase()}
             </p>
           </div>
           <div className="text-right text-xs text-slate-700">
@@ -1062,7 +1294,7 @@ export default function DashboardView({
                     <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
                     <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
                     <td className="border border-slate-400 p-1.5 text-right font-mono font-bold bg-slate-100">
-                      Bs. {fmt(selectedScenario === 'social1' ? f.fare_social_1_bs : f.fare_social_2_bs, 2)}
+                      Bs. {fmt(activeScenarioId === 'social1' ? f.fare_social_1_bs : f.fare_social_2_bs, 2)}
                     </td>
                   </tr>
                 ))}
@@ -1142,7 +1374,7 @@ export default function DashboardView({
       </div>
 
       {/* ========================================================================= */}
-      {/* 🔐 MODALES INTERACTIVOS DE AUTENTICACIÓN, EDICIÓN Y PANEL SUPERADMIN      */}
+      {/* 🔐 MODALES INTERACTIVOS DE AUTENTICACIÓN, EDICIÓN Y GESTOR DE ESCENARIOS */}
       {/* ========================================================================= */}
       
       {/* Modal de Autenticación */}
@@ -1163,6 +1395,16 @@ export default function DashboardView({
         onClose={() => setIsAdminPanelOpen(false)}
         currentUserRole={activeRole}
         currentUserEmail={userEmail}
+      />
+
+      {/* Modal Gestor de Escenarios Dinámicos */}
+      <ScenarioManagerModal
+        isOpen={isScenarioModalOpen}
+        onClose={() => setIsScenarioModalOpen(false)}
+        scenarios={scenarios}
+        onSaveScenario={handleSaveScenario}
+        onDeleteScenario={handleDeleteScenario}
+        onSelectScenario={(scId) => setActiveScenarioId(scId)}
       />
 
       {/* Modal de Edición de Parámetros */}
