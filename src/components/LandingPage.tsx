@@ -3,16 +3,15 @@
 import React from 'react';
 
 interface LandingPageProps {
-  onEnterSystem: () => void;
   onOpenLogin: () => void;
 }
 
-export default function LandingPage({ onEnterSystem, onOpenLogin }: LandingPageProps) {
+export default function LandingPage({ onOpenLogin }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
       
       {/* Top Navbar */}
-      <header className="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-30">
+      <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           <div className="flex items-center gap-3.5">
@@ -28,7 +27,7 @@ export default function LandingPage({ onEnterSystem, onOpenLogin }: LandingPageP
                   SIM-PRO v3.3
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 hidden sm:block">
                 Gobierno Autónomo Municipal de Sucre & Ecotraffic Consultoría
               </p>
             </div>
@@ -37,12 +36,12 @@ export default function LandingPage({ onEnterSystem, onOpenLogin }: LandingPageP
           <div className="flex items-center gap-3">
             <button
               onClick={onOpenLogin}
-              className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl transition-all"
+              className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl transition-all shadow-xs"
             >
               Iniciar Sesión
             </button>
             <button
-              onClick={onEnterSystem}
+              onClick={onOpenLogin}
               className="px-5 py-2.5 text-xs font-black text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 rounded-xl shadow-lg shadow-blue-600/25 transition-all active:scale-95"
             >
               Acceder al Simulador →
@@ -53,7 +52,7 @@ export default function LandingPage({ onEnterSystem, onOpenLogin }: LandingPageP
       </header>
 
       {/* Hero Section */}
-      <main className="flex-1 flex flex-col justify-center max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
+      <main className="flex-1 flex flex-col justify-center max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-12 sm:space-y-16">
         
         <div className="text-center space-y-6 max-w-4xl mx-auto">
           
@@ -72,7 +71,7 @@ export default function LandingPage({ onEnterSystem, onOpenLogin }: LandingPageP
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <button
-              onClick={onEnterSystem}
+              onClick={onOpenLogin}
               className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-500 text-white font-black text-sm shadow-xl shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
             >
               <span>Ingresar a la Sala de Negociación</span>
@@ -95,7 +94,7 @@ export default function LandingPage({ onEnterSystem, onOpenLogin }: LandingPageP
         </div>
 
         {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
           
           <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-xl font-black">

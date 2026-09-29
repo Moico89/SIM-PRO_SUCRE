@@ -35,27 +35,114 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
   const { email, password } = validation.data;
   const supabase = createClient();
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+  let assignedRole: UserRole = 'observador_publico';
+  let assignedOrg = 'Sociedad Civil';
+  let fullName = 'Usuario SIM-PRO';
 
-  if (error) {
-    return { success: false, error: error.message };
+  if (email.toLowerCase() === 'ecotraffic.bo@gmail.com') {
+    assignedRole = 'superadmin';
+    assignedOrg = 'Ecotraffic Consultoría';
+    fullName = 'SuperAdmin Ecotraffic';
+  } else if (email.toLowerCase().includes('sucre.bo') || email.toLowerCase().startsWith('admin')) {
+    assignedRole = 'admin_municipal';
+    assignedOrg = 'GAM Sucre';
+    fullName = 'Administrador Municipal GAMS';
+  } else if (email.toLowerCase().includes('consultor') || email.toLowerCase().includes('ecotraffic')) {
+    assignedRole = 'consultor_ecotraffic';
+    assignedOrg = 'Ecotraffic Consultoría';
+    fullName = 'Consultor Técnico';
+  } else if (email.toLowerCase().includes('sindicato') || email.toLowerCase().includes('chofer')) {
+    assignedRole = 'delegado_sindical';
+    assignedOrg = 'Sindicato de Transporte';
+    fullName = 'Delegado Sindical';
   }
 
-  if (data.user) {
-    // Si es ecotraffic.bo@gmail.com asegurar rol superadmin
-    if (data.user.email === 'ecotraffic.bo@gmail.com') {
-      await supabase
-        .from('profiles')
-        .update({ role: 'superadmin', organization: 'Ecotraffic Consultoría' })
-        .eq('id', data.user.id);
+  try {
+    // Intentar inicio de sesión
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      // Si el error es credenciales inválidas o usuario no encontrado, intentar auto-creación institucional
+      const isInstitutional = email.toLowerCase() === 'ecotraffic.bo@gmail.com' || email.toLowerCase().includes('sucre.bo');
+      if (isInstitutional || error.message.includes('Invalid login') || error.message.includes('not found')) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              organization: assignedOrg,
+              role: assignedRole
+            }
+          }
+        });
+
+        if (!signUpError && signUpData.user) {
+          await supabase.from('profiles').upsert({
+            id: signUpData.user.id,
+            email: signUpData.user.email!,
+            full_name: fullName,
+            role: assignedRole,
+            organization: assignedOrg,
+            is_active: true
+          });
+
+          revalidatePath('/');
+          return { 
+            success: true, 
+            user: signUpData.user, 
+            role: assignedRole, 
+            organization: assignedOrg,
+            fullName
+          };
+        }
+      }
+
+      // Si no es posible conectar a Supabase Auth o credenciales fallaron para cuenta general
+      return { success: false, error: `Error de autenticación: ${error.message}` };
     }
-  }
 
-  revalidatePath('/');
-  return { success: true, user: data.user };
+    if (data.user) {
+      // Obtener o sincronizar perfil
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profile) {
+        assignedRole = profile.role as UserRole;
+        assignedOrg = profile.organization;
+        fullName = profile.full_name;
+      } else {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email: data.user.email!,
+          full_name: fullName,
+          role: assignedRole,
+          organization: assignedOrg,
+          is_active: true
+        });
+      }
+
+      revalidatePath('/');
+      return { 
+        success: true, 
+        user: data.user, 
+        role: assignedRole, 
+        organization: assignedOrg,
+        fullName
+      };
+    }
+
+    return { success: false, error: 'No se pudo verificar la sesión.' };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error de conexión con el servicio de autenticación';
+    return { success: false, error: message };
+  }
 }
 
 export async function registerUser(input: z.infer<typeof SignUpSchema>) {

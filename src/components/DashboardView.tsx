@@ -85,7 +85,7 @@ export default function DashboardView({
   currentUserEmail = 'consultor@ecotraffic.com.bo'
 }: DashboardViewProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [viewMode, setViewMode] = useState<'landing' | 'dashboard'>('dashboard');
+  const [viewMode, setViewMode] = useState<'landing' | 'dashboard'>('landing');
   const [activeTab, setActiveTab] = useState<TabType>('resumen');
   
   // Parámetros, Tarifas y Bitácora
@@ -518,7 +518,6 @@ export default function DashboardView({
     return (
       <>
         <LandingPage
-          onEnterSystem={() => setViewMode('dashboard')}
           onOpenLogin={() => setIsAuthModalOpen(true)}
         />
         <AuthModal
@@ -529,7 +528,7 @@ export default function DashboardView({
             setActiveRole(role);
             setUserOrg(org);
             setViewMode('dashboard');
-            setStatusMessage({ text: `Sesión iniciada como ${role} (${email})`, type: 'success' });
+            setStatusMessage({ text: `Sesión institucional iniciada: ${role} (${email})`, type: 'success' });
           }}
         />
       </>
@@ -629,29 +628,19 @@ export default function DashboardView({
                 </button>
               )}
 
-              {/* Selector de Rol */}
-              <div className="relative">
-                <select
-                  value={activeRole}
-                  onChange={e => {
-                    const newR = e.target.value as UserRole;
-                    setActiveRole(newR);
-                    if (newR === 'superadmin') {
-                      setUserEmail('ecotraffic.bo@gmail.com');
-                      setUserOrg('Ecotraffic Consultoría');
-                    } else if (newR === 'admin_municipal') {
-                      setUserEmail('admin.transporte@sucre.bo');
-                      setUserOrg('GAM Sucre');
-                    }
-                  }}
-                  className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-xl outline-none cursor-pointer hover:border-slate-500"
-                >
-                  <option value="superadmin">👑 Rol: SuperAdmin (Ecotraffic)</option>
-                  <option value="admin_municipal">🏛️ Rol: Admin Municipal (GAMS)</option>
-                  <option value="consultor_ecotraffic">🔬 Rol: Consultor (Ecotraffic)</option>
-                  <option value="delegado_sindical">🚌 Rol: Delegado Sindical</option>
-                  <option value="observador_publico">👁️ Rol: Observador / Concejo</option>
-                </select>
+              {/* Badge de Identidad Autenticada Institucional (Acceso Controlado) */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-slate-900/90 border-slate-700 text-xs shadow-xs">
+                <span className="font-bold flex items-center gap-1.5 text-slate-200">
+                  {activeRole === 'superadmin' && '👑 SuperAdmin'}
+                  {activeRole === 'admin_municipal' && '🏛️ Admin Municipal'}
+                  {activeRole === 'consultor_ecotraffic' && '🔬 Consultor Técnico'}
+                  {activeRole === 'delegado_sindical' && '🚌 Delegado Sindical'}
+                  {activeRole === 'observador_publico' && '👁️ Observador'}
+                </span>
+                <span className="text-slate-600">|</span>
+                <span className="text-blue-300 font-mono text-[11px] max-w-[170px] truncate" title={userEmail}>
+                  {userEmail}
+                </span>
               </div>
 
               {/* Botón Cerrar Sesión */}
@@ -682,8 +671,18 @@ export default function DashboardView({
           {isMobileMenuOpen && (
             <div className="lg:hidden bg-slate-950 border-b border-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                <span className="text-slate-400">Rol Autenticado:</span>
+                <span className="font-bold text-amber-300">
+                  {activeRole === 'superadmin' && '👑 SuperAdmin'}
+                  {activeRole === 'admin_municipal' && '🏛️ Admin Municipal'}
+                  {activeRole === 'consultor_ecotraffic' && '🔬 Consultor Técnico'}
+                  {activeRole === 'delegado_sindical' && '🚌 Delegado Sindical'}
+                  {activeRole === 'observador_publico' && '👁️ Observador'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
                 <span className="text-slate-400">Usuario:</span>
-                <span className="font-mono text-blue-300 font-bold">{userEmail}</span>
+                <span className="font-mono text-blue-300 font-bold truncate max-w-[200px]">{userEmail}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

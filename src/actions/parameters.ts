@@ -30,7 +30,7 @@ export async function updateSystemParameter(input: UpdateParameterInput) {
   }
 
   // 2. Control de Acceso Basado en Roles (RBAC)
-  if (profile.role !== 'admin_municipal' && profile.role !== 'consultor_ecotraffic') {
+  if (profile.role !== 'superadmin' && profile.role !== 'admin_municipal' && profile.role !== 'consultor_ecotraffic') {
     return { 
       success: false, 
       error: `Acceso denegado. El rol '${profile.role}' no tiene privilegios para modificar parámetros del modelo oficial.` 
