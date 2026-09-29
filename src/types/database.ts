@@ -13,6 +13,20 @@ export type SessionStatus =
   | 'aprobada'
   | 'archivada';
 
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  short_name: string;
+  city: string;
+  country: string;
+  badge?: string;
+  is_active: boolean;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type AuditActionType = 
   | 'INSERT'
   | 'UPDATE'
@@ -21,6 +35,8 @@ export type AuditActionType =
   | 'CAMBIO_TARIFA'
   | 'CREACION_ESCENARIO'
   | 'EDICION_ESCENARIO'
+  | 'CREACION_USUARIO'
+  | 'CAMBIO_ROL_USUARIO'
   | 'BLOQUEO_SESION'
   | 'DESBLOQUEO_SESION'
   | 'LOGIN'
@@ -28,6 +44,7 @@ export type AuditActionType =
 
 export interface Profile {
   id: string;
+  tenant_id?: string;
   email: string;
   full_name: string;
   role: UserRole;

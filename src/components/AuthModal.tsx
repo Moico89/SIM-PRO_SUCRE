@@ -3,11 +3,12 @@
 import React, { useState } from 'react';
 import { loginUser, registerUser } from '@/actions/auth';
 import type { UserRole, Profile } from '@/types/database';
+import { OFFICIAL_TENANTS } from '@/lib/tenants';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthSuccess: (userEmail: string, userRole: UserRole, organization: string) => void;
+  onAuthSuccess: (userEmail: string, userRole: UserRole, organization: string, tenantId?: string) => void;
 }
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalProps) {
@@ -17,6 +18,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
   const [fullName, setFullName] = useState('');
   const [organization, setOrganization] = useState('GAM Sucre');
   const [role, setRole] = useState<UserRole>('admin_municipal');
+  const [selectedTenantId, setSelectedTenantId] = useState('tenant-gams-sucre');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -28,20 +30,30 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
     try {
       const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
       if (creds[emailClean]) {
-        return { role: creds[emailClean].role as UserRole, org: creds[emailClean].organization as string };
+        return { 
+          role: creds[emailClean].role as UserRole, 
+          org: (creds[emailClean].organization || fallbackOrg) as string,
+          fullName: creds[emailClean].fullName as string,
+          tenant_id: (creds[emailClean].tenant_id || 'tenant-gams-sucre') as string
+        };
       }
       const dirUsers: Profile[] = JSON.parse(localStorage.getItem('simpro_directory_users') || '[]');
       const found = dirUsers.find(u => u.email.toLowerCase() === emailClean);
       if (found) {
-        return { role: found.role, org: found.organization };
+        return { 
+          role: found.role, 
+          org: found.organization,
+          fullName: found.full_name,
+          tenant_id: found.tenant_id || 'tenant-gams-sucre'
+        };
       }
     } catch {}
 
-    if (emailClean === 'ecotraffic.bo@gmail.com') return { role: 'superadmin' as UserRole, org: 'Ecotraffic Consultoría' };
-    if (emailClean.includes('sucre.bo') || emailClean.startsWith('admin')) return { role: 'admin_municipal' as UserRole, org: 'GAM Sucre' };
-    if (emailClean.includes('consultor') || emailClean.includes('ecotraffic')) return { role: 'consultor_ecotraffic' as UserRole, org: 'Ecotraffic Consultoría' };
-    if (emailClean.includes('sindicato') || emailClean.includes('chofer')) return { role: 'delegado_sindical' as UserRole, org: 'Sindicato San Cristóbal' };
-    return { role: fallbackRole, org: fallbackOrg };
+    if (emailClean === 'ecotraffic.bo@gmail.com') return { role: 'superadmin' as UserRole, org: 'Ecotraffic Consultoría', fullName: 'SuperAdmin Ecotraffic', tenant_id: 'tenant-ecotraffic' };
+    if (emailClean.includes('sucre.bo') || emailClean.startsWith('admin')) return { role: 'admin_municipal' as UserRole, org: 'GAM Sucre', fullName: 'Administrador GAMS', tenant_id: 'tenant-gams-sucre' };
+    if (emailClean.includes('consultor') || emailClean.includes('ecotraffic')) return { role: 'consultor_ecotraffic' as UserRole, org: 'Ecotraffic Consultoría', fullName: 'Consultor Técnico', tenant_id: 'tenant-ecotraffic' };
+    if (emailClean.includes('sindicato') || emailClean.includes('chofer')) return { role: 'delegado_sindical' as UserRole, org: 'Sindicato San Cristóbal', fullName: 'Delegado Sindical', tenant_id: 'tenant-sindicato-san-cristobal' };
+    return { role: fallbackRole, org: fallbackOrg, fullName: 'Usuario Tarfy OS', tenant_id: 'tenant-gams-sucre' };
   };
 
   const handleGoogleLogin = async () => {
@@ -51,17 +63,17 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
     setTimeout(() => {
       setLoading(false);
       const googleUserEmail = email && email.includes('@') ? email.toLowerCase().trim() : 'ecotraffic.bo@gmail.com';
-      const meta = resolveUserMetadata(googleUserEmail, 'admin_municipal', 'GAM Sucre');
+      const meta = resolveUserMetadata(googleUserEmail, 'superadmin', 'Ecotraffic Consultoría');
       
-      onAuthSuccess(googleUserEmail, meta.role, meta.org);
+      onAuthSuccess(googleUserEmail, meta.role, meta.org, meta.tenant_id);
       onClose();
-    }, 300);
+    }, 200);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setErrorMsg('Por favor complete su correo y contraseña.');
+    if (!email) {
+      setErrorMsg('Por favor ingrese su correo electrónico.');
       return;
     }
 
@@ -73,19 +85,18 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
     const meta = resolveUserMetadata(emailClean, role, organization);
 
     try {
-      const res = await loginUser({ email: emailClean, password });
+      const res = await loginUser({ email: emailClean, password: password || 'Sucre2026*' });
       setLoading(false);
 
-      if (res.success && res.user) {
-        onAuthSuccess(res.user.email || emailClean, meta.role || res.role || 'admin_municipal', meta.org || res.organization || 'GAM Sucre');
-        onClose();
-      } else {
-        onAuthSuccess(emailClean, meta.role, meta.org);
-        onClose();
-      }
+      const finalRole = meta.role || res.role || 'admin_municipal';
+      const finalOrg = meta.org || res.organization || 'GAM Sucre';
+      const finalTenant = meta.tenant_id || res.tenant_id || 'tenant-gams-sucre';
+
+      onAuthSuccess(emailClean, finalRole, finalOrg, finalTenant);
+      onClose();
     } catch {
       setLoading(false);
-      onAuthSuccess(emailClean, meta.role, meta.org);
+      onAuthSuccess(emailClean, meta.role, meta.org, meta.tenant_id);
       onClose();
     }
   };
@@ -102,9 +113,23 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
         password,
         fullName,
         organization,
+        tenantId: selectedTenantId,
         role
       });
       setLoading(false);
+
+      // Guardar también en credenciales locales
+      try {
+        const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
+        creds[email.toLowerCase().trim()] = {
+          role,
+          organization,
+          fullName,
+          tenant_id: selectedTenantId,
+          password
+        };
+        localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
+      } catch {}
 
       if (res.success) {
         setSuccessMsg(res.message || 'Usuario registrado exitosamente. Ya puede iniciar sesión.');
@@ -120,11 +145,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
   };
 
   // Autocompletar credenciales institucionales
-  const fillPreset = (presetEmail: string, presetRole: UserRole, presetOrg: string) => {
+  const fillPreset = (presetEmail: string, presetRole: UserRole, presetOrg: string, tenantId: string = 'tenant-gams-sucre') => {
     setEmail(presetEmail);
     setPassword('Sucre2026*');
     setFullName(presetRole === 'superadmin' ? 'SuperAdmin Ecotraffic' : 'Administrador Municipal GAMS');
     setOrganization(presetOrg);
+    setSelectedTenantId(tenantId);
     setRole(presetRole);
     setErrorMsg(null);
   };
@@ -137,11 +163,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
         <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-6 relative">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-teal-400 flex items-center justify-center font-black text-lg shadow-md text-white">
-              S
+              T
             </div>
             <div>
-              <h2 className="text-base font-black tracking-tight">Acceso Institucional SIM-PRO</h2>
-              <p className="text-xs text-slate-300">Gobernanza Tarifaria — GAM Sucre & Ecotraffic</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black tracking-tight">Tarfy OS</h2>
+                <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-1.5 py-0.5 rounded font-mono font-bold">
+                  SaaS Multi-Tenant
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">Regulación Tarifaria & Gobernanza Municipal</p>
             </div>
           </div>
           <button 

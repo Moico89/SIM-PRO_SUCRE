@@ -122,9 +122,23 @@ export default function DashboardView({
   const isSuperAdmin = activeRole === 'superadmin' || userEmail === 'ecotraffic.bo@gmail.com';
   const canEdit = isSuperAdmin || activeRole === 'admin_municipal' || activeRole === 'consultor_ecotraffic';
 
+  const [activeTenantId, setActiveTenantId] = useState<string>('tenant-gams-sucre');
+
   useEffect(() => {
     setIsMounted(true);
     try {
+      const savedSession = localStorage.getItem('tarfy_session');
+      if (savedSession) {
+        const parsedSess = JSON.parse(savedSession);
+        if (parsedSess.email) {
+          setUserEmail(parsedSess.email);
+          setActiveRole(parsedSess.role || 'admin_municipal');
+          setUserOrg(parsedSess.org || 'GAM Sucre');
+          if (parsedSess.tenantId) setActiveTenantId(parsedSess.tenantId);
+          setViewMode('dashboard');
+        }
+      }
+
       const savedParams = localStorage.getItem('simpro_params');
       if (savedParams) {
         const parsed = JSON.parse(savedParams);
@@ -642,7 +656,21 @@ export default function DashboardView({
   };
 
   const handleLogout = () => {
+    try { localStorage.removeItem('tarfy_session'); } catch {}
     setViewMode('landing');
+    setStatusMessage({ text: 'Sesión finalizada correctamente.', type: 'success' });
+  };
+
+  const handleAuthSuccess = (email: string, role: UserRole, org: string, tenantId?: string) => {
+    setUserEmail(email);
+    setActiveRole(role);
+    setUserOrg(org);
+    if (tenantId) setActiveTenantId(tenantId);
+    try {
+      localStorage.setItem('tarfy_session', JSON.stringify({ email, role, org, tenantId: tenantId || 'tenant-gams-sucre' }));
+    } catch {}
+    setViewMode('dashboard');
+    setStatusMessage({ text: `Sesión institucional iniciada: ${role} (${email})`, type: 'success' });
   };
 
   // Si está en modo Landing Page
@@ -655,13 +683,7 @@ export default function DashboardView({
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
-          onAuthSuccess={(email, role, org) => {
-            setUserEmail(email);
-            setActiveRole(role);
-            setUserOrg(org);
-            setViewMode('dashboard');
-            setStatusMessage({ text: `Sesión institucional iniciada: ${role} (${email})`, type: 'success' });
-          }}
+          onAuthSuccess={handleAuthSuccess}
         />
       </>
     );
@@ -686,25 +708,25 @@ export default function DashboardView({
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setViewMode('landing')}
-                className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center font-black text-white text-base shadow-md hover:scale-105 transition-all"
+                className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center font-black text-white text-base shadow-md hover:scale-105 transition-all cursor-pointer"
                 title="Volver a la Portada Institucional"
               >
-                S
+                T
               </button>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm tracking-tight text-white">
-                    TRANSITAR SUCRE
+                    Tarfy OS
                   </span>
                   <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded font-mono font-bold">
                     SaaS v3.3
                   </span>
                   <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/30 px-1.5 py-0.5 rounded font-semibold hidden md:inline">
-                    GAM Sucre & Ecotraffic
+                    {userOrg || 'GAM Sucre'}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 hidden sm:block">
-                  Plataforma de Concertación Tarifaria y Auditoría en Tiempo Real
+                  Plataforma de Gobernanza Tarifaria & COV en Tiempo Real
                 </p>
               </div>
             </div>
@@ -1512,12 +1534,7 @@ export default function DashboardView({
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={(email, role, org) => {
-          setUserEmail(email);
-          setActiveRole(role);
-          setUserOrg(org);
-          setStatusMessage({ text: `Sesión iniciada como ${role} (${email})`, type: 'success' });
-        }}
+        onAuthSuccess={handleAuthSuccess}
       />
 
       {/* Panel de Gestión de Usuarios Admin & SuperAdmin */}

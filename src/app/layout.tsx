@@ -3,13 +3,13 @@ import './globals.css';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
-  title: 'Sistema de Gobernanza Tarifaria Sucre v3.3 — GAM Sucre & Ecotraffic',
-  description: 'Dashboard Web en Tiempo Real con Autenticación Multi-Rol y Auditoría Inmutable para la Concertación Tarifaria del Transporte Público',
+  title: 'Tarfy OS — Plataforma de Gobernanza & Regulación Tarifaria SaaS (GAMS & Ecotraffic)',
+  description: 'Sistema Operativo de Gobernanza Tarifaria, Modelación del Costo de Operación Vehicular (COV) y Auditoría Inmutable para Gobiernos Municipales.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'SIM-PRO Tarifa',
+    title: 'Tarfy OS',
   },
 };
 

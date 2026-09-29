@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { Profile, UserRole } from '@/types/database';
+import type { Profile, UserRole, Tenant } from '@/types/database';
 import type { ScenarioConfig } from '@/types/scenario';
 import { getAllUsers, createAdminUserBySuperAdmin, toggleUserActiveStatus, updateUserRoleBySuperAdmin } from '@/actions/auth';
+import { OFFICIAL_TENANTS } from '@/lib/tenants';
 
 interface AdminUsersPanelProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface AdminUsersPanelProps {
 const defaultDirectoryUsers: Profile[] = [
   {
     id: 'u-1',
+    tenant_id: 'tenant-ecotraffic',
     email: 'ecotraffic.bo@gmail.com',
     full_name: 'SuperAdmin Principal Ecotraffic',
     role: 'superadmin',
@@ -30,6 +32,7 @@ const defaultDirectoryUsers: Profile[] = [
   },
   {
     id: 'u-2',
+    tenant_id: 'tenant-gams-sucre',
     email: 'admin.transporte@sucre.bo',
     full_name: 'Dirección de Tráfico y Transporte GAMS',
     role: 'admin_municipal',
@@ -40,6 +43,7 @@ const defaultDirectoryUsers: Profile[] = [
   },
   {
     id: 'u-3',
+    tenant_id: 'tenant-ecotraffic',
     email: 'consultor@ecotraffic.com.bo',
     full_name: 'Ing. Rolando Consultor Senior',
     role: 'consultor_ecotraffic',
@@ -50,6 +54,7 @@ const defaultDirectoryUsers: Profile[] = [
   },
   {
     id: 'u-4',
+    tenant_id: 'tenant-sindicato-san-cristobal',
     email: 'sindicato.sancristobal@gmail.com',
     full_name: 'Delegado Choferes San Cristóbal',
     role: 'delegado_sindical',
@@ -73,12 +78,14 @@ export default function AdminUsersPanel({
 }: AdminUsersPanelProps) {
   const [users, setUsers] = useState<Profile[]>(defaultDirectoryUsers);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'scenarios'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'tenants' | 'scenarios'>('list');
+  const [tenantFilter, setTenantFilter] = useState<string>('all');
   
   // Form de nuevo admin
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('Sucre2026*');
   const [newFullName, setNewFullName] = useState('');
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('tenant-gams-sucre');
   const [newOrganization, setNewOrganization] = useState('GAM Sucre');
   const [newRole, setNewRole] = useState<UserRole>('admin_municipal');
   const [formSubmitting, setFormSubmitting] = useState(false);
@@ -144,12 +151,14 @@ export default function AdminUsersPanel({
     setActionMessage(null);
 
     const emailClean = newEmail.toLowerCase().trim();
+    const assignedTenant = OFFICIAL_TENANTS.find(t => t.id === selectedTenantId) || OFFICIAL_TENANTS[0];
 
     const newUser: Profile = {
       id: `usr-${Date.now()}`,
+      tenant_id: assignedTenant.id,
       email: emailClean,
       full_name: newFullName.trim(),
-      organization: newOrganization,
+      organization: newOrganization || assignedTenant.name,
       role: newRole,
       is_active: true,
       created_at: new Date().toISOString(),
@@ -168,7 +177,8 @@ export default function AdminUsersPanel({
       const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
       creds[emailClean] = {
         role: newRole,
-        organization: newOrganization,
+        organization: newOrganization || assignedTenant.name,
+        tenant_id: assignedTenant.id,
         fullName: newFullName.trim(),
         password: newPassword
       };
@@ -181,14 +191,15 @@ export default function AdminUsersPanel({
         email: emailClean,
         password: newPassword,
         fullName: newFullName.trim(),
-        organization: newOrganization,
+        organization: newOrganization || assignedTenant.name,
+        tenantId: assignedTenant.id,
         role: newRole
       });
     } catch {}
 
     setFormSubmitting(false);
     setActionMessage({ 
-      text: `Usuario ${newRole.toUpperCase()} '${newFullName.trim()}' (${emailClean}) creado y autorizado exitosamente.`, 
+      text: `Usuario ${newRole.toUpperCase()} '${newFullName.trim()}' (${emailClean}) creado y asignado a '${assignedTenant.short_name}' exitosamente.`, 
       type: 'success' 
     });
     setNewEmail('');
@@ -315,7 +326,7 @@ export default function AdminUsersPanel({
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            Usuarios Registrados ({users.length})
+            Usuarios ({users.length})
           </button>
 
           {isSuperAdmin && (
@@ -327,9 +338,20 @@ export default function AdminUsersPanel({
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              + Crear Nuevo Administrador (Nivel 1)
+              + Crear Administrador Nivel 1
             </button>
           )}
+
+          <button
+            onClick={() => setActiveTab('tenants')}
+            className={`pb-3 text-xs font-bold transition-all relative ${
+              activeTab === 'tenants'
+                ? 'text-emerald-700 border-b-2 border-emerald-700'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            🏛️ Cuentas SaaS & Tenants ({OFFICIAL_TENANTS.length})
+          </button>
 
           <button
             onClick={() => setActiveTab('scenarios')}
@@ -347,12 +369,28 @@ export default function AdminUsersPanel({
         <div className="p-6 overflow-y-auto flex-1">
           {activeTab === 'list' && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-600">Filtrar por Cuenta / Tenant:</span>
+                  <select
+                    value={tenantFilter}
+                    onChange={e => setTenantFilter(e.target.value)}
+                    className="p-1.5 border border-slate-300 rounded-xl text-xs bg-white font-medium outline-none"
+                  >
+                    <option value="all">Todos los Tenants</option>
+                    {OFFICIAL_TENANTS.map(t => (
+                      <option key={t.id} value={t.id}>{t.short_name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
                       <th className="p-3">Usuario & Nombre</th>
-                      <th className="p-3">Organización</th>
+                      <th className="p-3">Cuenta Tenant</th>
                       <th className="p-3">Rol Asignado</th>
                       <th className="p-3 text-center">Estado</th>
                       {isSuperAdmin && <th className="p-3 text-right">Acciones</th>}
@@ -363,13 +401,18 @@ export default function AdminUsersPanel({
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-slate-400">Cargando directorio de usuarios...</td>
                       </tr>
-                    ) : users.map(u => (
+                    ) : users.filter(u => tenantFilter === 'all' || (u.tenant_id ? u.tenant_id === tenantFilter : (tenantFilter === 'tenant-gams-sucre' && u.organization.includes('GAM Sucre')))).map(u => (
                       <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{u.full_name}</div>
                           <div className="text-[11px] text-slate-500 font-mono">{u.email}</div>
                         </td>
-                        <td className="p-3 font-semibold text-slate-700">{u.organization}</td>
+                        <td className="p-3">
+                          <div className="font-semibold text-slate-800">{u.organization}</div>
+                          <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded font-mono">
+                            {OFFICIAL_TENANTS.find(t => t.id === u.tenant_id)?.short_name || 'GAMS - Sucre'}
+                          </span>
+                        </td>
                         <td className="p-3">
                           {isSuperAdmin && u.email !== 'ecotraffic.bo@gmail.com' ? (
                             <select
@@ -425,10 +468,62 @@ export default function AdminUsersPanel({
             </div>
           )}
 
+          {activeTab === 'tenants' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-emerald-950 uppercase">Catálogo de Cuentas SaaS Multi-Tenant</h3>
+                  <p className="text-[11px] text-emerald-800">Espacios de trabajo independientes para gobiernos municipales y federaciones de transporte</p>
+                </div>
+                <span className="px-2.5 py-1 bg-emerald-600 text-white font-mono font-bold text-xs rounded-xl shadow-xs">
+                  {OFFICIAL_TENANTS.length} Activos
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {OFFICIAL_TENANTS.map(t => (
+                  <div key={t.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2 hover:border-blue-400 transition-all">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">{t.name}</h4>
+                        <span className="text-[11px] text-slate-500">{t.city}, {t.country} ({t.currency})</span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full border border-blue-200">
+                        {t.badge || 'SaaS Tenant'}
+                      </span>
+                    </div>
+                    <div className="pt-2 flex justify-between items-center text-xs text-slate-600 border-t border-slate-100">
+                      <span className="font-mono text-[11px]">ID: {t.slug}</span>
+                      <span className="font-semibold text-emerald-700">● 100% Operativo</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'create' && (
             <form onSubmit={handleCreateUser} className="max-w-lg mx-auto space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
               <h3 className="text-sm font-bold text-slate-900 mb-2">Crear Nuevo Administrador Institucional</h3>
               
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Cuenta / Tenant Asignado:</label>
+                <select
+                  value={selectedTenantId}
+                  onChange={e => {
+                    const tId = e.target.value;
+                    setSelectedTenantId(tId);
+                    const tenant = OFFICIAL_TENANTS.find(t => t.id === tId);
+                    if (tenant) setNewOrganization(tenant.name);
+                  }}
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {OFFICIAL_TENANTS.map(t => (
+                    <option key={t.id} value={t.id}>{t.short_name} — {t.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo:</label>
                 <input
@@ -455,18 +550,14 @@ export default function AdminUsersPanel({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Organización:</label>
-                  <select
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Organización / Entidad:</label>
+                  <input
+                    type="text"
                     value={newOrganization}
                     onChange={e => setNewOrganization(e.target.value)}
+                    required
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="GAM Sucre">GAM Sucre</option>
-                    <option value="Ecotraffic Consultoría">Ecotraffic Consultoría</option>
-                    <option value="Concejo Municipal">Concejo Municipal</option>
-                    <option value="Sindicato San Cristóbal">Sindicato San Cristóbal</option>
-                    <option value="Sindicato Sucre">Sindicato Sucre</option>
-                  </select>
+                  />
                 </div>
 
                 <div>

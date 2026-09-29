@@ -15,6 +15,7 @@ const SignUpSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   fullName: z.string().min(3, 'Nombre completo requerido'),
   organization: z.string().min(2, 'Organización requerida'),
+  tenantId: z.string().optional(),
   role: z.enum(['superadmin', 'admin_municipal', 'delegado_sindical', 'consultor_ecotraffic', 'observador_publico']).default('observador_publico')
 });
 
@@ -23,6 +24,7 @@ const CreateAdminSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   fullName: z.string().min(3, 'Nombre requerido'),
   organization: z.string().min(2, 'Organización requerida'),
+  tenantId: z.string().optional(),
   role: z.enum(['superadmin', 'admin_municipal', 'delegado_sindical', 'consultor_ecotraffic', 'observador_publico'])
 });
 
@@ -37,23 +39,28 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
 
   let assignedRole: UserRole = 'observador_publico';
   let assignedOrg = 'Sociedad Civil';
-  let fullName = 'Usuario SIM-PRO';
+  let assignedTenantId = 'tenant-gams-sucre';
+  let fullName = 'Usuario Tarfy OS';
 
   if (emailLower === 'ecotraffic.bo@gmail.com' || emailLower.includes('ecotraffic')) {
     assignedRole = 'superadmin';
     assignedOrg = 'Ecotraffic Consultoría';
+    assignedTenantId = 'tenant-ecotraffic';
     fullName = 'SuperAdmin Ecotraffic';
   } else if (emailLower.includes('sucre.bo') || emailLower.startsWith('admin')) {
     assignedRole = 'admin_municipal';
     assignedOrg = 'GAM Sucre';
+    assignedTenantId = 'tenant-gams-sucre';
     fullName = 'Administrador Municipal GAMS';
   } else if (emailLower.includes('consultor')) {
     assignedRole = 'consultor_ecotraffic';
     assignedOrg = 'Ecotraffic Consultoría';
+    assignedTenantId = 'tenant-ecotraffic';
     fullName = 'Consultor Técnico';
   } else if (emailLower.includes('sindicato') || emailLower.includes('chofer')) {
     assignedRole = 'delegado_sindical';
     assignedOrg = 'Sindicato San Cristóbal';
+    assignedTenantId = 'tenant-sindicato-san-cristobal';
     fullName = 'Delegado Sindical';
   }
 
@@ -79,6 +86,7 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
             assignedRole = profile.role as UserRole;
             assignedOrg = profile.organization;
             fullName = profile.full_name;
+            if (profile.tenant_id) assignedTenantId = profile.tenant_id;
           }
         } catch {
           // Fallback a roles predefinidos
@@ -90,6 +98,7 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
           user: { id: data.user.id, email: data.user.email || emailLower },
           role: assignedRole,
           organization: assignedOrg,
+          tenant_id: assignedTenantId,
           fullName
         };
       }
@@ -104,6 +113,7 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
       user: { id: `usr-${Date.now()}`, email: emailLower },
       role: assignedRole,
       organization: assignedOrg,
+      tenant_id: assignedTenantId,
       fullName
     };
   } catch (err: unknown) {
