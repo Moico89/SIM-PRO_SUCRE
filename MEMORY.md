@@ -34,3 +34,14 @@
   3. `32_Rutas_Rentabilidad`: Modelación ruta por ruta (IPK, flota asignada, ingresos y balance operativo).
   4. `52_Items_Mantenimiento`: Desglose detallado de los 52 ítems Nissan Civilian con costos unitarios, frecuencias y costo mensual calibrado en Bs. 2.840,17.
   5. `Bitacora_Auditoria_Legal`: Historial inmutable con firma digital del operador, justificación y estampas de tiempo ISO.
+
+## 7. Tarfy OS: Arquitectura SaaS Multi-Tenant & Motor de Autenticación
+- **Catálogo de Tenants**:
+  - `tenant-gams-sucre`: Gobierno Autónomo Municipal de Sucre (Tenant #1 Oficial).
+  - `tenant-ecotraffic`: Ecotraffic Consultoría Regulatoria & Movilidad.
+  - `tenant-sindicato-san-cristobal`: Sindicato de Choferes San Cristóbal.
+  - `tenant-sindicato-sucre`: Sindicato de Micros y Colectivos Sucre.
+- **Motor de Autenticación & Creación de Usuarios**:
+  - SuperAdmin (`ecotraffic.bo@gmail.com`) crea y autoriza usuarios Administradores Nivel 1 asignándolos a cualquier Tenant/Organización.
+  - Persistencia de sesión bidireccional (`tarfy_session`, `simpro_custom_credentials`, `simpro_directory_users`) con restauración automática al recargar o navegar entre Landing Page y Simulador.
+  - Soporte unificado para Google OAuth y credenciales institucionales seguras.
