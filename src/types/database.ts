@@ -1,8 +1,10 @@
 export type UserRole = 
+  | 'superadmin'
   | 'admin_municipal'
   | 'delegado_sindical'
   | 'consultor_ecotraffic'
   | 'observador_publico';
+
 
 export type SessionStatus = 
   | 'borrador'

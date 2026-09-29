@@ -5,6 +5,8 @@ import type { SystemParameters, FareCategory, AuditLog, UserRole } from '@/types
 import { updateSystemParameter } from '@/actions/parameters';
 import { createClient } from '@/lib/supabase/client';
 import type { UpdateParameterInput } from '@/lib/validations/parameters';
+import AuthModal from '@/components/AuthModal';
+import AdminUsersPanel from '@/components/AdminUsersPanel';
 
 interface DashboardViewProps {
   initialParameters: SystemParameters;
@@ -31,7 +33,16 @@ export default function DashboardView({
   const [fares, setFares] = useState<FareCategory[]>(initialFares);
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioType>('social2');
+  
+  // Estado de Usuario y Sesión
   const [activeRole, setActiveRole] = useState<UserRole>(currentRole);
+  const [userEmail, setUserEmail] = useState<string>(currentUserEmail);
+  const [userOrg, setUserOrg] = useState<string>(
+    currentUserEmail === 'ecotraffic.bo@gmail.com' ? 'Ecotraffic Consultoría' : 'GAM Sucre'
+  );
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'offline'>('connecting');
   const [, startTransition] = useTransition();
@@ -43,6 +54,9 @@ export default function DashboardView({
   const [justification, setJustification] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const isSuperAdmin = activeRole === 'superadmin' || userEmail === 'ecotraffic.bo@gmail.com';
+  const canEdit = isSuperAdmin || activeRole === 'admin_municipal' || activeRole === 'consultor_ecotraffic';
 
   useEffect(() => {
     setIsMounted(true);
@@ -123,7 +137,6 @@ export default function DashboardView({
     }
   }, [params.session_id]);
 
-
   // Formateador seguro contra errores de hidratación SSR
   const fmt = (num: number, decimals: number = 0) => {
     if (!isMounted) return num.toFixed(decimals);
@@ -187,8 +200,6 @@ export default function DashboardView({
   const economicProfit = monthlyRevenue - regulatoryCost;
   const householdIncome = laborCost + freeCash;
 
-  const canEdit = activeRole === 'admin_municipal' || activeRole === 'consultor_ecotraffic';
-
   // 32 Rutas del sistema
   const routesList = [
     { id: 1, union: "San Cristóbal", line: "Línea 12 amarillo", distance: 15.49, fleet: 30.49 },
@@ -250,65 +261,22 @@ export default function DashboardView({
 
   const deficitRoutesCount = calculatedRoutes.filter(r => r.isDeficit).length;
 
-  // Manejo de exportación a Excel dinámico
+  // Descarga del Archivo Excel Maestro Oficial
   const handleExportExcel = () => {
     try {
-      const XLSX = window.XLSX;
-      if (XLSX) {
-        const wb = XLSX.utils.book_new();
-        
-        // Hoja 1: Resumen de Parámetros
-        const summaryData = [
-          ["SISTEMA DE GOBERNANZA TARIFARIA SUCRE v3.3 - GAM SUCRE & ECOTRAFFIC"],
-          ["Escenario Activo", selectedScenario],
-          ["Fecha de Exportación", new Date().toLocaleString('es-BO')],
-          [],
-          ["Indicador", "Valor", "Unidad"],
-          ["Tarifa Adulto", activeAdultFare, "Bs/viaje"],
-          ["Tarifa Técnica Adulto", 3.4485, "Bs/viaje"],
-          ["Tarifa Ponderada Red", activeWeightedFare, "Bs/viaje"],
-          ["Tarifa Técnica Ponderada", technicalWeighted, "Bs/viaje"],
-          ["Ingreso Mensual Hogar", householdIncome, "Bs/mes"],
-          ["Utilidad Excedente Mensual", economicProfit, "Bs/mes"],
-          ["OPEX Efectivo", opex, "Bs/mes"],
-          ["Costo Regulatorio Total", regulatoryCost, "Bs/mes"],
-          ["Flota Activa", fleet, "vehículos"],
-          ["km Red Día", kmDay, "km/día"],
-          ["Demanda Día", demandDay, "pasajeros/día"],
-          ["Mantenimiento v2", params.maintenance_monthly_bs, "Bs/mes"]
-        ];
-        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen_Ejecutivo");
-
-        // Hoja 2: Tarifas por Categoría
-        const faresData = [
-          ["Categoría Social", "% Demanda", "Viajes/Día", "Vigente (Bs)", "Técnica Eq. (Bs)", "Social 1 (Bs)", "Social 2 (Bs)"],
-          ...fares.map(f => [f.name, f.demand_share, f.daily_trips, f.fare_current_bs, f.fare_technical_bs, f.fare_social_1_bs, f.fare_social_2_bs])
-        ];
-        const wsFares = XLSX.utils.aoa_to_sheet(faresData);
-        XLSX.utils.book_append_sheet(wb, wsFares, "Tarifas_Categorias");
-
-        // Hoja 3: Rutas
-        const routesData = [
-          ["ID", "Sindicato", "Línea", "Distancia Ciclo (km)", "Flota", "km/Mes", "Pasajeros/Mes", "Recaudación (Bs)", "Costo (Bs)", "Utilidad (Bs)", "Estado"],
-          ...calculatedRoutes.map(r => [
-            r.id, r.union, r.line, r.distance, r.fleet, r.kmMes, r.paxMes, r.routeRev, r.routeReg, r.routeProfit, r.isDeficit ? "DÉFICIT" : "CUBRE COSTO"
-          ])
-        ];
-        const wsRoutes = XLSX.utils.aoa_to_sheet(routesData);
-        XLSX.utils.book_append_sheet(wb, wsRoutes, "32_Rutas_Rentabilidad");
-
-        XLSX.writeFile(wb, `Modelo_Tarifario_Sucre_${selectedScenario}_v3.3.xlsx`);
-      } else {
-        // Redirigir a descarga directa del archivo master de Google Drive
-        window.open("https://drive.google.com/file/d/1IjhXzM7y1Awv6ONity8ckblUCdkxCEOg/view?usp=drivesdk", "_blank");
-      }
+      // Descarga directa del archivo maestro alojado en /public
+      const link = document.createElement('a');
+      link.href = '/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx';
+      link.download = `Modelo_Oficial_Tarifario_Sucre_${selectedScenario}_v3.3.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch {
-      window.open("https://drive.google.com/file/d/1IjhXzM7y1Awv6ONity8ckblUCdkxCEOg/view?usp=drivesdk", "_blank");
+      window.open("/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx", "_blank");
     }
   };
 
-  // Manejo de exportación a PDF
+  // Manejo de exportación a PDF (Dossier Oficial)
   const handleExportPDF = () => {
     window.print();
   };
@@ -352,9 +320,9 @@ export default function DashboardView({
       const newLog: AuditLog = {
         id: crypto.randomUUID(),
         session_id: params.session_id,
-        user_email: currentUserEmail,
+        user_email: userEmail,
         user_role: activeRole,
-        user_organization: activeRole === 'admin_municipal' ? 'GAM Sucre' : 'Ecotraffic',
+        user_organization: userOrg,
         action: 'CAMBIO_PARAMETRO',
         entity_name: 'system_parameters',
         field_name: editField,
@@ -370,559 +338,838 @@ export default function DashboardView({
   };
 
   return (
-    <div className="min-h-screen bg-slate-900/5 text-slate-900 font-sans pb-16">
-      {/* Script SheetJS para exportación Excel */}
-      <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <div className="min-h-screen bg-slate-900/5 text-slate-900 font-sans">
 
-      {/* Top Enterprise SaaS Bar */}
-      <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-teal-500 flex items-center justify-center font-black text-white text-base shadow-sm">
-              S
+      {/* ========================================================================= */}
+      {/* 🖥️ INTERFAZ DE PANTALLA COMPLETA (OCULTA AUTOMÁTICAMENTE AL IMPRIMIR PDF)  */}
+      {/* ========================================================================= */}
+      <div className="print:hidden pb-16">
+        
+        {/* Top Enterprise SaaS Bar */}
+        <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 shadow-xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            
+            {/* Branding & Identidad Oficial */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center font-black text-white text-base shadow-md">
+                S
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm tracking-tight text-white">
+                    TRANSITAR SUCRE
+                  </span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded font-mono font-bold">
+                    SaaS v3.3
+                  </span>
+                  <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/30 px-1.5 py-0.5 rounded font-semibold hidden md:inline">
+                    GAM Sucre & Ecotraffic
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 hidden sm:block">
+                  Plataforma de Concertación Tarifaria y Auditoría en Tiempo Real
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm tracking-tight text-white">
-                  TRANSITAR SUCRE
-                </span>
-                <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded font-mono font-bold">
-                  SaaS v3.3
-                </span>
-                <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/30 px-1.5 py-0.5 rounded font-semibold hidden md:inline">
-                  GAM Sucre & Ecotraffic
+
+            {/* Desktop Quick Actions */}
+            <div className="hidden lg:flex items-center gap-2.5">
+              
+              {/* Indicador de Estado Realtime */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-slate-900 border-slate-700">
+                <span className={`w-2 h-2 rounded-full ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-emerald-400 animate-pulse' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-amber-400 animate-pulse'
+                    : 'bg-slate-400'
+                }`} />
+                <span className="text-slate-300 font-mono">
+                  {realtimeStatus === 'connected' ? 'En Vivo' : realtimeStatus === 'connecting' ? 'Conectando...' : 'Offline'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">
-                Plataforma de Concertación Tarifaria y Auditoría en Tiempo Real
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Indicador de Estado Realtime / WebSockets */}
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-slate-900 border-slate-700">
-              <span className={`w-2 h-2 rounded-full ${
-                realtimeStatus === 'connected' 
-                  ? 'bg-emerald-400 animate-pulse' 
-                  : realtimeStatus === 'connecting'
-                  ? 'bg-amber-400 animate-pulse'
-                  : 'bg-slate-400'
-              }`} />
-              <span className="text-slate-300">
-                {realtimeStatus === 'connected' ? 'En Vivo' : realtimeStatus === 'connecting' ? 'Conectando...' : 'Offline'}
-              </span>
-            </div>
-
-            {/* Botón Descargar PDF */}
-            <button
-              onClick={handleExportPDF}
-              className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-              title="Descargar o Imprimir Reporte Oficial en PDF"
-            >
-              <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-              </svg>
-              <span>Reporte PDF</span>
-            </button>
-
-            {/* Botón Descargar Excel */}
-            <button
-              onClick={handleExportExcel}
-              className="bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-600/60 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs"
-              title="Descargar Hoja Excel .xlsx del Modelo Auditado"
-            >
-              <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              <span>Excel .xlsx</span>
-            </button>
-
-            {/* Role Switcher */}
-            <div className="relative">
-              <select
-                value={activeRole}
-                onChange={e => setActiveRole(e.target.value as UserRole)}
-                className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none cursor-pointer hover:border-slate-600"
-              >
-                <option value="admin_municipal">Rol: Admin Municipal (GAMS)</option>
-                <option value="consultor_ecotraffic">Rol: Consultor (Ecotraffic)</option>
-                <option value="delegado_sindical">Rol: Delegado Sindical</option>
-                <option value="observador_publico">Rol: Observador / Concejo</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main SaaS Workspace */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        
-        {/* Banner de Retroalimentación */}
-        {statusMessage && (
-          <div className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm ${
-            statusMessage.type === 'success' 
-              ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-              : 'bg-rose-50 text-rose-900 border-rose-200'
-          }`}>
-            <span>{statusMessage.text}</span>
-            <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-700">&times;</button>
-          </div>
-        )}
-
-        {/* Header de Negociación y Escenarios SaaS */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Mesa de Concertación:</span>
-              <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Sesión Activa
-              </span>
-            </div>
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              Escenarios de Negociación Tarifaria
-            </h2>
-          </div>
-
-          {/* Segmented Control de Escenarios */}
-          <div className="bg-slate-100 p-1.5 rounded-xl flex flex-wrap gap-1 border border-slate-200">
-            {[
-              { id: 'social2' as const, label: 'Social 2 (Bs. 3,50)', badge: 'RECOMENDADO', color: 'text-emerald-700 font-extrabold' },
-              { id: 'social1' as const, label: 'Social 1 (Bs. 3,80)', badge: '', color: 'text-slate-700' },
-              { id: 'technical' as const, label: 'Técnica (Bs. 3,45)', badge: 'EQUILIBRIO', color: 'text-blue-700' },
-              { id: 'current' as const, label: 'Vigente (Bs. 4,50)', badge: '', color: 'text-slate-700' },
-              { id: 'stress' as const, label: 'Estrés (-10% / +15%)', badge: '', color: 'text-amber-700' }
-            ].map(sc => (
+              {/* Botón Descargar PDF Oficial */}
               <button
-                key={sc.id}
-                onClick={() => setSelectedScenario(sc.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  selectedScenario === sc.id
-                    ? 'bg-white text-slate-950 shadow-sm border border-slate-200/80'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-slate-200/60'
+                onClick={handleExportPDF}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                title="Imprimir o Descargar Dossier PDF Oficial Formateado"
+              >
+                <svg className="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                <span>Reporte PDF</span>
+              </button>
+
+              {/* Botón Descargar Excel Maestro Oficial */}
+              <button
+                onClick={handleExportExcel}
+                className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-600/70 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                title="Descargar Planilla Maestra Completa de Ecotraffic (.xlsx)"
+              >
+                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Excel Maestro .xlsx</span>
+              </button>
+
+              {/* Botón SuperAdmin Panel */}
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setIsAdminPanelOpen(true)}
+                  className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                >
+                  <span>👑 Panel Admin</span>
+                </button>
+              )}
+
+              {/* Selector de Rol Dinámico */}
+              <div className="relative">
+                <select
+                  value={activeRole}
+                  onChange={e => {
+                    const newR = e.target.value as UserRole;
+                    setActiveRole(newR);
+                    if (newR === 'superadmin') {
+                      setUserEmail('ecotraffic.bo@gmail.com');
+                      setUserOrg('Ecotraffic Consultoría');
+                    } else if (newR === 'admin_municipal') {
+                      setUserEmail('admin.transporte@sucre.bo');
+                      setUserOrg('GAM Sucre');
+                    }
+                  }}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-xl outline-none cursor-pointer hover:border-slate-500"
+                >
+                  <option value="superadmin">👑 Rol: SuperAdmin (Ecotraffic)</option>
+                  <option value="admin_municipal">🏛️ Rol: Admin Municipal (GAMS)</option>
+                  <option value="consultor_ecotraffic">🔬 Rol: Consultor (Ecotraffic)</option>
+                  <option value="delegado_sindical">🚌 Rol: Delegado Sindical</option>
+                  <option value="observador_publico">👁️ Rol: Observador / Concejo</option>
+                </select>
+              </div>
+
+              {/* Botón de Autenticación / Perfil */}
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+              >
+                <span>{userEmail ? userEmail.split('@')[0] : 'Iniciar Sesión'}</span>
+              </button>
+            </div>
+
+            {/* Mobile Hamburger Menu Toggle */}
+            <div className="flex lg:hidden items-center gap-2">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}/>
+                </svg>
+              </button>
+            </div>
+
+          </div>
+
+          {/* Mobile Drawer Dropdown */}
+          {isMobileMenuOpen && (
+            <div className="lg:hidden bg-slate-950 border-b border-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                <span className="text-slate-400">Usuario activo:</span>
+                <span className="font-mono text-blue-300 font-bold">{userEmail}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { handleExportPDF(); setIsMobileMenuOpen(false); }}
+                  className="p-2.5 bg-slate-800 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5"
+                >
+                  <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                  </svg>
+                  <span>Descargar PDF</span>
+                </button>
+
+                <button
+                  onClick={() => { handleExportExcel(); setIsMobileMenuOpen(false); }}
+                  className="p-2.5 bg-emerald-950 rounded-xl text-xs font-bold text-emerald-200 border border-emerald-600/60 flex items-center justify-center gap-1.5"
+                >
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  <span>Excel Maestro</span>
+                </button>
+              </div>
+
+              {isSuperAdmin && (
+                <button
+                  onClick={() => { setIsAdminPanelOpen(true); setIsMobileMenuOpen(false); }}
+                  className="w-full py-2.5 bg-amber-500/20 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/40 text-center"
+                >
+                  👑 Abrir Panel SuperAdmin
+                </button>
+              )}
+
+              <button
+                onClick={() => { setIsAuthModalOpen(true); setIsMobileMenuOpen(false); }}
+                className="w-full py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl text-center"
+              >
+                Cambiar de Cuenta / Iniciar Sesión
+              </button>
+            </div>
+          )}
+        </header>
+
+        {/* Main SaaS Workspace */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+          
+          {/* Banner de Retroalimentación */}
+          {statusMessage && (
+            <div className={`p-4 rounded-2xl text-xs font-semibold flex items-center justify-between border shadow-sm ${
+              statusMessage.type === 'success' 
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+                : 'bg-rose-50 text-rose-900 border-rose-200'
+            }`}>
+              <span>{statusMessage.text}</span>
+              <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-700 font-bold">&times;</button>
+            </div>
+          )}
+
+          {/* Header de Negociación y Escenarios SaaS */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Mesa de Concertación:</span>
+                <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Sesión Activa Oficial
+                </span>
+              </div>
+              <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                Escenarios de Negociación Tarifaria
+              </h2>
+            </div>
+
+            {/* Segmented Control de Escenarios */}
+            <div className="bg-slate-100 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-slate-200/80 w-full md:w-auto">
+              {[
+                { id: 'social2' as const, label: 'Social 2 (Bs. 3,50)', badge: 'RECOMENDADO', color: 'text-emerald-700 font-extrabold' },
+                { id: 'social1' as const, label: 'Social 1 (Bs. 3,80)', badge: '', color: 'text-slate-700' },
+                { id: 'technical' as const, label: 'Técnica (Bs. 3,45)', badge: 'EQUILIBRIO', color: 'text-blue-700' },
+                { id: 'current' as const, label: 'Vigente (Bs. 4,50)', badge: '', color: 'text-slate-700' },
+                { id: 'stress' as const, label: 'Estrés (-10% / +15%)', badge: '', color: 'text-amber-700' }
+              ].map(sc => (
+                <button
+                  key={sc.id}
+                  onClick={() => setSelectedScenario(sc.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    selectedScenario === sc.id
+                      ? 'bg-white text-slate-950 shadow-sm border border-slate-200/80 font-bold'
+                      : 'text-slate-600 hover:text-slate-950 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <span className={sc.color}>{sc.label}</span>
+                  {sc.badge && (
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold">
+                      {sc.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Métricas Principales (6 SaaS Metric Cards) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+            {/* Card 1: Tarifa Adulto */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Adulto</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                Bs. {fmt(activeAdultFare, 2)}
+              </div>
+              <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                <span>+3,9% s/ técnica</span>
+              </div>
+              <div className="absolute top-0 right-0 w-2 h-full bg-emerald-500"></div>
+            </div>
+
+            {/* Card 2: Tarifa Técnica Eq. */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Técnica Eq.</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                Bs. 3,45
+              </div>
+              <div className="text-[11px] text-blue-700 font-semibold mt-1">
+                Equilibrio financiero
+              </div>
+              <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
+            </div>
+
+            {/* Card 3: Tarifa Ponderada */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Ponderada</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                Bs. {fmt(activeWeightedFare, 4)}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Téc: Bs. {fmt(technicalWeighted, 4)}
+              </div>
+              <div className="absolute top-0 right-0 w-2 h-full bg-teal-500"></div>
+            </div>
+
+            {/* Card 4: Ingreso Hogar */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ingreso Hogar</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                Bs. {fmt(Math.round(householdIncome), 0)}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Salario + Retorno mes
+              </div>
+              <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
+            </div>
+
+            {/* Card 5: Utilidad Excedente */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Utilidad Excedente</div>
+              <div className={`text-2xl font-black mt-1 ${economicProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                Bs. {fmt(Math.round(economicProfit), 0)}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Sobre WACC 11%
+              </div>
+              <div className={`absolute top-0 right-0 w-2 h-full ${economicProfit >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+            </div>
+
+            {/* Card 6: Mantenimiento v2 */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mantenimiento v2</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">
+                Bs. {fmt(params.maintenance_monthly_bs, 2)}
+              </div>
+              <div className="text-[11px] text-emerald-700 font-bold mt-1">
+                -32,7% Ahorro auditado
+              </div>
+              <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
+            </div>
+          </div>
+
+          {/* Narrative Box */}
+          <div className="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/50 rounded-2xl border border-amber-200/80 p-4 shadow-xs flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-800 flex items-center justify-center font-black text-sm">
+                ℹ
+              </div>
+              <div className="text-xs text-slate-800 leading-relaxed font-medium">
+                <strong>Diagnóstico Técnico Oficial:</strong> Con la tarifa <strong>Social 2 (Bs. 3,50)</strong>, el microbús recauda <strong>Bs. {fmt(monthlyRevenue, 0)}/mes</strong>, cubriendo el 100% del costo regulatorio (Bs. {fmt(regulatoryCost, 0)}/mes), asegurando la reposición de la flota y generando un ingreso digno de <strong>Bs. {fmt(householdIncome, 0)}/mes</strong> para la familia del operador.
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap hidden lg:block">
+              IPK: {fmt(ipk, 2)} pax/km
+            </span>
+          </div>
+
+          {/* SaaS Navigation Tabs */}
+          <div className="flex border-b border-slate-200 gap-6 overflow-x-auto">
+            {[
+              { id: 'resumen' as const, label: 'Resumen Ejecutivo & COV' },
+              { id: 'tarifas' as const, label: 'Estructura por Categoría Social' },
+              { id: 'rutas' as const, label: `Rentabilidad 32 Rutas (${deficitRoutesCount} deficitarias)` },
+              { id: 'auditoria' as const, label: `Bitácora de Auditoría (${logs.length} logs)` }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`pb-3 text-xs font-bold transition-all whitespace-nowrap relative ${
+                  activeTab === tab.id
+                    ? 'text-blue-700 border-b-2 border-blue-700'
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <span className={sc.color}>{sc.label}</span>
-                {sc.badge && (
-                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold">
-                    {sc.badge}
-                  </span>
-                )}
+                {tab.label}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Métricas Principales (6 SaaS Metric Cards) */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-          {/* Card 1: Tarifa Adulto */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Adulto</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              Bs. {fmt(activeAdultFare, 2)}
-            </div>
-            <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
-              <span>+3,9% s/ técnica</span>
-            </div>
-            <div className="absolute top-0 right-0 w-2 h-full bg-emerald-500"></div>
-          </div>
+          {/* TAB 1: RESUMEN & COV */}
+          {activeTab === 'resumen' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Parámetros Auditados */}
+              <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Parámetros Operativos del Sistema</h3>
+                    <p className="text-[11px] text-slate-500">Valores auditados de la red y del microbús Nissan Civilian</p>
+                  </div>
+                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                    canEdit ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {canEdit ? 'Edición Habilitada' : 'Solo Lectura'}
+                  </span>
+                </div>
 
-          {/* Card 2: Tarifa Técnica Eq. */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Técnica Eq.</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              Bs. 3,45
-            </div>
-            <div className="text-[11px] text-blue-700 font-semibold mt-1">
-              Equilibrio financiero
-            </div>
-            <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
-          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {[
+                    { key: 'fuel_price_bs_l' as const, label: 'Precio Diésel', val: params.fuel_price_bs_l, unit: 'Bs/litro' },
+                    { key: 'fuel_efficiency_km_l' as const, label: 'Rendimiento Diésel Base', val: params.fuel_efficiency_km_l, unit: 'km/l (+15% ralentí)' },
+                    { key: 'maintenance_monthly_bs' as const, label: 'Mantenimiento Mensual v2', val: params.maintenance_monthly_bs, unit: 'Bs/mes (-32,7%)' },
+                    { key: 'driver_salary_bs' as const, label: 'Salario Chofer Profesional', val: params.driver_salary_bs, unit: 'Bs/mes (+8,33% aguinaldo)' },
+                    { key: 'fleet_active' as const, label: 'Flota Activa en Servicio', val: params.fleet_active, unit: 'microbuses' },
+                    { key: 'turns_day' as const, label: 'Vueltas por Día / Unidad', val: params.turns_day, unit: 'vueltas/día' },
+                    { key: 'demand_network_day' as const, label: 'Demanda Diaria Total', val: params.demand_network_day, unit: 'pasajeros/día' },
+                    { key: 'km_network_day' as const, label: 'Producción de Red (GPS)', val: params.km_network_day, unit: 'km/día' }
+                  ].map(item => (
+                    <div
+                      key={item.key}
+                      onClick={() => canEdit && handleOpenEdit(item.key, item.val)}
+                      className={`p-3 rounded-2xl border flex justify-between items-center transition-all ${
+                        canEdit
+                          ? 'border-slate-200/80 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer shadow-2xs active:scale-98'
+                          : 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-90'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-700">{item.label}</div>
+                        <div className="text-[10px] text-slate-400">{item.unit}</div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-slate-900 font-mono">
+                          {fmt(item.val, item.val % 1 !== 0 ? 2 : 0)}
+                        </span>
+                        {canEdit && (
+                          <span className="block text-[9px] text-blue-600 font-bold mt-0.5">Editar</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-          {/* Card 3: Tarifa Ponderada */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Ponderada</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              Bs. {fmt(activeWeightedFare, 4)}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1">
-              Téc: Bs. {fmt(technicalWeighted, 4)}
-            </div>
-            <div className="absolute top-0 right-0 w-2 h-full bg-teal-500"></div>
-          </div>
+              {/* Estructura de Costos COV */}
+              <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Estructura del Costo Regulatorio (COV)</h3>
+                  <p className="text-[11px] text-slate-500">Costo mensual total por unidad: Bs. {fmt(regulatoryCost, 2)}</p>
+                </div>
 
-          {/* Card 4: Ingreso Hogar */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ingreso Hogar</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              Bs. {fmt(Math.round(householdIncome), 0)}
-            </div>
-            <div className="text-[11px] text-slate-500 mt-1">
-              Salario + Retorno mes
-            </div>
-            <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
-          </div>
+                <div className="space-y-3">
+                  {[
+                    { name: 'Combustible Diésel (+15% congestión)', val: fuelCost, share: (fuelCost / regulatoryCost) * 100, color: 'bg-blue-600' },
+                    { name: 'Mantenimiento Auditado v2 (Variable + Fijo)', val: params.maintenance_monthly_bs, share: (params.maintenance_monthly_bs / regulatoryCost) * 100, color: 'bg-teal-600' },
+                    { name: 'Personal de Conducción (Sueldo + Aguinaldo)', val: laborCost, share: (laborCost / regulatoryCost) * 100, color: 'bg-orange-500' },
+                    { name: 'Costos Administrativos y Seguros', val: otherFixed, share: (otherFixed / regulatoryCost) * 100, color: 'bg-amber-500' },
+                    { name: 'Costo de Capital (Depreciación + WACC 11%)', val: depreciation + allowedReturn, share: ((depreciation + allowedReturn) / regulatoryCost) * 100, color: 'bg-emerald-600' }
+                  ].map(cost => (
+                    <div key={cost.name}>
+                      <div className="flex justify-between text-xs font-semibold mb-1">
+                        <span className="text-slate-700">{cost.name}</span>
+                        <span className="text-slate-900 font-mono font-bold">Bs. {fmt(Math.round(cost.val), 0)} ({fmt(cost.share, 1)}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div className={`h-full ${cost.color}`} style={{ width: `${cost.share}%` }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-          {/* Card 5: Utilidad Excedente */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Utilidad Excedente</div>
-            <div className={`text-2xl font-black mt-1 ${economicProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-              Bs. {fmt(Math.round(economicProfit), 0)}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 text-xs space-y-1.5 mt-2">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">OPEX Efectivo en Caja:</span>
+                    <strong className="text-slate-900 font-mono">Bs. {fmt(opex, 2)} / mes</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Reserva de Reposición Vehicular (10 años):</span>
+                    <strong className="text-slate-900 font-mono">Bs. {fmt(depreciation, 2)} / mes</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Retorno Justo al Capital (11% WACC):</span>
+                    <strong className="text-slate-900 font-mono">Bs. {fmt(allowedReturn, 2)} / mes</strong>
+                  </div>
+                  <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-slate-900">
+                    <span>COSTO ECONÓMICO REGULATORIO TOTAL:</span>
+                    <span className="text-emerald-700 font-mono font-black text-sm">Bs. {fmt(regulatoryCost, 2)} / mes</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">
-              Sobre WACC 11%
-            </div>
-            <div className={`absolute top-0 right-0 w-2 h-full ${economicProfit >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-          </div>
+          )}
 
-          {/* Card 6: Mantenimiento v2 */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mantenimiento v2</div>
-            <div className="text-2xl font-black text-slate-900 mt-1">
-              Bs. {fmt(params.maintenance_monthly_bs, 2)}
-            </div>
-            <div className="text-[11px] text-emerald-700 font-bold mt-1">
-              -32,7% Ahorro auditado
-            </div>
-            <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
-          </div>
-        </div>
+          {/* TAB 2: TARIFAS POR CATEGORÍA */}
+          {activeTab === 'tarifas' && (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Matriz de Tarifas por Categoría Social</h3>
+                <p className="text-[11px] text-slate-500">Comparación de recaudación y subsidios cruzados por tipo de pasajero</p>
+              </div>
 
-        {/* Narrative Box */}
-        <div className="bg-gradient-to-r from-amber-50 to-white rounded-2xl border border-amber-200/70 p-4 shadow-xs flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-800 flex items-center justify-center font-bold text-sm">
-              ℹ
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                      <th className="p-3">Categoría Social</th>
+                      <th className="p-3 text-right">% Demanda</th>
+                      <th className="p-3 text-right">Viajes / Día</th>
+                      <th className="p-3 text-right">Vigente (Bs)</th>
+                      <th className="p-3 text-right">Técnica Eq. (Bs)</th>
+                      <th className="p-3 text-right">Social 1 (Bs)</th>
+                      <th className="p-3 text-right bg-emerald-50 text-emerald-900">Social 2 (Bs. 3,50)</th>
+                      <th className="p-3 text-right">Dif. Soc2 - Téc</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {fares.map(f => (
+                      <tr key={f.name} className="hover:bg-slate-50/80">
+                        <td className="p-3 font-semibold text-slate-900">{f.name}</td>
+                        <td className="p-3 text-right font-mono">{fmt(f.demand_share * 100, 1)}%</td>
+                        <td className="p-3 text-right font-mono">{fmt(f.daily_trips, 0)}</td>
+                        <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
+                        <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
+                        <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_social_1_bs, 2)}</td>
+                        <td className="p-3 text-right font-mono font-bold bg-emerald-50/50 text-emerald-900">
+                          Bs. {fmt(f.fare_social_2_bs, 2)}
+                        </td>
+                        <td className={`p-3 text-right font-mono font-semibold ${
+                          f.fare_social_2_bs - f.fare_technical_bs >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                        }`}>
+                          {f.fare_social_2_bs - f.fare_technical_bs >= 0 ? '+' : ''}
+                          {fmt(f.fare_social_2_bs - f.fare_technical_bs, 4)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300">
+                      <td className="p-3">PROMEDIO PONDERADO</td>
+                      <td className="p-3 text-right">100.0%</td>
+                      <td className="p-3 text-right">{fmt(demandDay, 0)}</td>
+                      <td className="p-3 text-right">Bs. {fmt(currentWeighted, 4)}</td>
+                      <td className="p-3 text-right">Bs. {fmt(technicalWeighted, 4)}</td>
+                      <td className="p-3 text-right">Bs. {fmt(social1Weighted, 4)}</td>
+                      <td className="p-3 text-right bg-emerald-100 text-emerald-950 font-black">
+                        Bs. {fmt(social2Weighted, 4)}
+                      </td>
+                      <td className="p-3 text-right text-emerald-700 font-black">
+                        +{fmt(social2Weighted - technicalWeighted, 4)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="text-xs text-slate-800 leading-relaxed font-medium">
-              <strong>Diagnóstico Técnico Oficial:</strong> Con la tarifa <strong>Social 2 (Bs. 3,50)</strong>, el microbús recauda <strong>Bs. {fmt(monthlyRevenue, 0)}/mes</strong>, cubriendo el 100% del costo regulatorio (Bs. {fmt(regulatoryCost, 0)}/mes), asegurando la reposición de la flota y generando un ingreso digno de <strong>Bs. {fmt(householdIncome, 0)}/mes</strong> para la familia del operador.
-            </div>
-          </div>
-          <span className="text-[11px] text-slate-500 font-mono whitespace-nowrap hidden lg:block">
-            IPK: {fmt(ipk, 2)} pax/km
-          </span>
-        </div>
+          )}
 
-        {/* SaaS Navigation Tabs */}
-        <div className="flex border-b border-slate-200 gap-6">
-          {[
-            { id: 'resumen' as const, label: 'Resumen Ejecutivo & COV' },
-            { id: 'tarifas' as const, label: 'Estructura por Categoría Social' },
-            { id: 'rutas' as const, label: `Rentabilidad 32 Rutas (${deficitRoutesCount} deficitarias)` },
-            { id: 'auditoria' as const, label: `Bitácora de Auditoría (${logs.length} logs)` }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 text-xs font-bold transition-all relative ${
-                activeTab === tab.id
-                  ? 'text-blue-700 border-b-2 border-blue-700'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* TAB 1: RESUMEN & COV */}
-        {activeTab === 'resumen' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Parámetros Auditados */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          {/* TAB 3: 32 RUTAS */}
+          {activeTab === 'rutas' && (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Parámetros Operativos del Sistema</h3>
-                  <p className="text-[11px] text-slate-500">Valores auditados de la red y del microbús Nissan Civilian</p>
+                  <h3 className="text-sm font-bold text-slate-900">Rentabilidad de las 32 Rutas Urbanas</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Conciliación de red (Factor: 1,0050) bajo el escenario activo <strong>{selectedScenario}</strong>
+                  </p>
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                  canEdit ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {canEdit ? 'Edición Habilitada' : 'Solo Lectura'}
+                <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold">
+                  {deficitRoutesCount} rutas deficitarias / {calculatedRoutes.length} totales
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {[
-                  { key: 'fuel_price_bs_l' as const, label: 'Precio Diésel', val: params.fuel_price_bs_l, unit: 'Bs/litro' },
-                  { key: 'fuel_efficiency_km_l' as const, label: 'Rendimiento Diésel Base', val: params.fuel_efficiency_km_l, unit: 'km/l (+15% ralentí)' },
-                  { key: 'maintenance_monthly_bs' as const, label: 'Mantenimiento Mensual v2', val: params.maintenance_monthly_bs, unit: 'Bs/mes (-32,7%)' },
-                  { key: 'driver_salary_bs' as const, label: 'Salario Chofer Profesional', val: params.driver_salary_bs, unit: 'Bs/mes (+8,33% aguinaldo)' },
-                  { key: 'fleet_active' as const, label: 'Flota Activa en Servicio', val: params.fleet_active, unit: 'microbuses' },
-                  { key: 'turns_day' as const, label: 'Vueltas por Día / Unidad', val: params.turns_day, unit: 'vueltas/día' },
-                  { key: 'demand_network_day' as const, label: 'Demanda Diaria Total', val: params.demand_network_day, unit: 'pasajeros/día' },
-                  { key: 'km_network_day' as const, label: 'Producción de Red (GPS)', val: params.km_network_day, unit: 'km/día' }
-                ].map(item => (
-                  <div
-                    key={item.key}
-                    onClick={() => canEdit && handleOpenEdit(item.key, item.val)}
-                    className={`p-3 rounded-xl border flex justify-between items-center transition-all ${
-                      canEdit
-                        ? 'border-slate-200/80 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer shadow-2xs'
-                        : 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-90'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-[11px] font-semibold text-slate-700">{item.label}</div>
-                      <div className="text-[10px] text-slate-400">{item.unit}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-slate-900 font-mono">
-                        {fmt(item.val, item.val % 1 !== 0 ? 2 : 0)}
-                      </span>
-                      {canEdit && (
-                        <span className="block text-[9px] text-blue-600 font-semibold mt-0.5">Editar</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Estructura de Costos COV */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Estructura del Costo Regulatorio (COV)</h3>
-                <p className="text-[11px] text-slate-500">Costo mensual total por unidad: Bs. {fmt(regulatoryCost, 2)}</p>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  { name: 'Combustible Diésel (+15% congestión)', val: fuelCost, share: (fuelCost / regulatoryCost) * 100, color: 'bg-blue-600' },
-                  { name: 'Mantenimiento Auditado v2 (Variable + Fijo)', val: params.maintenance_monthly_bs, share: (params.maintenance_monthly_bs / regulatoryCost) * 100, color: 'bg-teal-600' },
-                  { name: 'Personal de Conducción (Sueldo + Aguinaldo)', val: laborCost, share: (laborCost / regulatoryCost) * 100, color: 'bg-orange-500' },
-                  { name: 'Costos Administrativos y Seguros', val: otherFixed, share: (otherFixed / regulatoryCost) * 100, color: 'bg-amber-500' },
-                  { name: 'Costo de Capital (Depreciación + WACC 11%)', val: depreciation + allowedReturn, share: ((depreciation + allowedReturn) / regulatoryCost) * 100, color: 'bg-emerald-600' }
-                ].map(cost => (
-                  <div key={cost.name}>
-                    <div className="flex justify-between text-xs font-semibold mb-1">
-                      <span className="text-slate-700">{cost.name}</span>
-                      <span className="text-slate-900 font-mono">Bs. {fmt(Math.round(cost.val), 0)} ({fmt(cost.share, 1)}%)</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className={`h-full ${cost.color}`} style={{ width: `${cost.share}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1.5 mt-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">OPEX Efectivo en Caja:</span>
-                  <strong className="text-slate-900 font-mono">Bs. {fmt(opex, 2)} / mes</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Reserva de Reposición Vehicular (10 años):</span>
-                  <strong className="text-slate-900 font-mono">Bs. {fmt(depreciation, 2)} / mes</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Retorno Justo al Capital (11% WACC):</span>
-                  <strong className="text-slate-900 font-mono">Bs. {fmt(allowedReturn, 2)} / mes</strong>
-                </div>
-                <div className="border-t border-slate-200 pt-1.5 flex justify-between font-bold text-slate-900">
-                  <span>COSTO ECONÓMICO REGULATORIO TOTAL:</span>
-                  <span className="text-emerald-700 font-mono">Bs. {fmt(regulatoryCost, 2)} / mes</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: TARIFAS POR CATEGORÍA */}
-        {activeTab === 'tarifas' && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Matriz de Tarifas por Categoría Social</h3>
-              <p className="text-[11px] text-slate-500">Comparación de recaudación y subsidios cruzados por tipo de pasajero</p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
-                    <th className="p-3">Categoría Social</th>
-                    <th className="p-3 text-right">% Demanda</th>
-                    <th className="p-3 text-right">Viajes / Día</th>
-                    <th className="p-3 text-right">Vigente (Bs)</th>
-                    <th className="p-3 text-right">Técnica Eq. (Bs)</th>
-                    <th className="p-3 text-right">Social 1 (Bs)</th>
-                    <th className="p-3 text-right bg-emerald-50 text-emerald-900">Social 2 (Bs. 3,50)</th>
-                    <th className="p-3 text-right">Dif. Soc2 - Téc</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {fares.map(f => (
-                    <tr key={f.name} className="hover:bg-slate-50/80">
-                      <td className="p-3 font-semibold text-slate-900">{f.name}</td>
-                      <td className="p-3 text-right font-mono">{fmt(f.demand_share * 100, 1)}%</td>
-                      <td className="p-3 text-right font-mono">{fmt(f.daily_trips, 0)}</td>
-                      <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
-                      <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
-                      <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_social_1_bs, 2)}</td>
-                      <td className="p-3 text-right font-mono font-bold bg-emerald-50/50 text-emerald-900">
-                        Bs. {fmt(f.fare_social_2_bs, 2)}
-                      </td>
-                      <td className={`p-3 text-right font-mono font-semibold ${
-                        f.fare_social_2_bs - f.fare_technical_bs >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                      }`}>
-                        {f.fare_social_2_bs - f.fare_technical_bs >= 0 ? '+' : ''}
-                        {fmt(f.fare_social_2_bs - f.fare_technical_bs, 4)}
-                      </td>
+              <div className="overflow-x-auto max-h-[500px] rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-slate-50 shadow-xs z-10">
+                    <tr className="border-b border-slate-200 text-slate-700 font-bold">
+                      <th className="p-2.5">ID</th>
+                      <th className="p-2.5">Sindicato</th>
+                      <th className="p-2.5">Línea de Transporte</th>
+                      <th className="p-2.5 text-right">Ciclo (km)</th>
+                      <th className="p-2.5 text-right">Flota</th>
+                      <th className="p-2.5 text-right">km / Mes</th>
+                      <th className="p-2.5 text-right">Pax / Mes</th>
+                      <th className="p-2.5 text-right">Recaudación</th>
+                      <th className="p-2.5 text-right">Costo Reg.</th>
+                      <th className="p-2.5 text-right">Utilidad Excedente</th>
+                      <th className="p-2.5 text-center">Estado</th>
                     </tr>
-                  ))}
-                  <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300">
-                    <td className="p-3">PROMEDIO PONDERADO</td>
-                    <td className="p-3 text-right">100.0%</td>
-                    <td className="p-3 text-right">{fmt(demandDay, 0)}</td>
-                    <td className="p-3 text-right">Bs. {fmt(currentWeighted, 4)}</td>
-                    <td className="p-3 text-right">Bs. {fmt(technicalWeighted, 4)}</td>
-                    <td className="p-3 text-right">Bs. {fmt(social1Weighted, 4)}</td>
-                    <td className="p-3 text-right bg-emerald-100 text-emerald-950 font-black">
-                      Bs. {fmt(social2Weighted, 4)}
-                    </td>
-                    <td className="p-3 text-right text-emerald-700 font-black">
-                      +{fmt(social2Weighted - technicalWeighted, 4)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: 32 RUTAS */}
-        {activeTab === 'rutas' && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Rentabilidad de las 32 Rutas Urbanas</h3>
-                <p className="text-[11px] text-slate-500">
-                  Conciliación de red (Factor: 1,0050) bajo el escenario activo <strong>{selectedScenario}</strong>
-                </p>
-              </div>
-              <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold">
-                {deficitRoutesCount} rutas deficitarias / {calculatedRoutes.length} totales
-              </span>
-            </div>
-
-            <div className="overflow-x-auto max-h-[500px]">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 bg-slate-50 shadow-xs z-10">
-                  <tr className="border-b border-slate-200 text-slate-700 font-bold">
-                    <th className="p-2.5">ID</th>
-                    <th className="p-2.5">Sindicato</th>
-                    <th className="p-2.5">Línea de Transporte</th>
-                    <th className="p-2.5 text-right">Ciclo (km)</th>
-                    <th className="p-2.5 text-right">Flota</th>
-                    <th className="p-2.5 text-right">km / Mes</th>
-                    <th className="p-2.5 text-right">Pax / Mes</th>
-                    <th className="p-2.5 text-right">Recaudación</th>
-                    <th className="p-2.5 text-right">Costo Reg.</th>
-                    <th className="p-2.5 text-right">Utilidad Excedente</th>
-                    <th className="p-2.5 text-center">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {calculatedRoutes.map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50/80">
-                      <td className="p-2.5 text-slate-400 font-mono">{r.id}</td>
-                      <td className="p-2.5 font-semibold text-slate-700">{r.union}</td>
-                      <td className="p-2.5 font-bold text-slate-900">{r.line}</td>
-                      <td className="p-2.5 text-right font-mono">{fmt(r.distance, 1)}</td>
-                      <td className="p-2.5 text-right font-mono">{fmt(r.fleet, 1)}</td>
-                      <td className="p-2.5 text-right font-mono">{fmt(r.kmMes, 0)}</td>
-                      <td className="p-2.5 text-right font-mono">{fmt(r.paxMes, 0)}</td>
-                      <td className="p-2.5 text-right font-mono">Bs. {fmt(r.routeRev, 0)}</td>
-                      <td className="p-2.5 text-right font-mono">Bs. {fmt(r.routeReg, 0)}</td>
-                      <td className={`p-2.5 text-right font-mono font-bold ${
-                        r.routeProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                      }`}>
-                        Bs. {fmt(r.routeProfit, 0)}
-                      </td>
-                      <td className="p-2.5 text-center">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                          r.isDeficit 
-                            ? 'bg-rose-100 text-rose-800' 
-                            : 'bg-emerald-100 text-emerald-800'
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {calculatedRoutes.map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50/80">
+                        <td className="p-2.5 text-slate-400 font-mono">{r.id}</td>
+                        <td className="p-2.5 font-semibold text-slate-700">{r.union}</td>
+                        <td className="p-2.5 font-bold text-slate-900">{r.line}</td>
+                        <td className="p-2.5 text-right font-mono">{fmt(r.distance, 1)}</td>
+                        <td className="p-2.5 text-right font-mono">{fmt(r.fleet, 1)}</td>
+                        <td className="p-2.5 text-right font-mono">{fmt(r.kmMes, 0)}</td>
+                        <td className="p-2.5 text-right font-mono">{fmt(r.paxMes, 0)}</td>
+                        <td className="p-2.5 text-right font-mono">Bs. {fmt(r.routeRev, 0)}</td>
+                        <td className="p-2.5 text-right font-mono">Bs. {fmt(r.routeReg, 0)}</td>
+                        <td className={`p-2.5 text-right font-mono font-bold ${
+                          r.routeProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'
                         }`}>
-                          {r.isDeficit ? 'DÉFICIT' : 'CUBRE'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: BITÁCORA DE AUDITORÍA */}
-        {activeTab === 'auditoria' && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Bitácora Inmutable de Auditoría (Audit Logs)</h3>
-                <p className="text-[11px] text-slate-500">
-                  Trazabilidad jurídica: cada ajuste exige usuario, rol, fecha, valores y justificación obligatoria
-                </p>
+                          Bs. {fmt(r.routeProfit, 0)}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                            r.isDeficit 
+                              ? 'bg-rose-100 text-rose-800' 
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {r.isDeficit ? 'DÉFICIT' : 'CUBRE'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono font-bold">
-                Append-Only (No Modificable)
-              </span>
             </div>
+          )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
-                    <th className="p-2.5">Fecha y Hora</th>
-                    <th className="p-2.5">Usuario / Rol</th>
-                    <th className="p-2.5">Organización</th>
-                    <th className="p-2.5">Acción</th>
-                    <th className="p-2.5">Parámetro</th>
-                    <th className="p-2.5">Justificación Registrada</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {logs.map(log => (
-                    <tr key={log.id} className="hover:bg-slate-50/80">
-                      <td className="p-2.5 text-slate-500 font-mono whitespace-nowrap">
-                        {new Date(log.created_at).toLocaleString('es-BO')}
-                      </td>
-                      <td className="p-2.5 font-medium text-slate-900 whitespace-nowrap">
-                        {log.user_email}
-                        <span className="block text-[10px] text-blue-600 font-mono">{log.user_role}</span>
-                      </td>
-                      <td className="p-2.5 text-slate-600 whitespace-nowrap">
-                        {log.user_organization}
-                      </td>
-                      <td className="p-2.5 whitespace-nowrap">
-                        <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded font-semibold">
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="p-2.5 font-mono text-slate-800 whitespace-nowrap">
-                        {log.field_name || log.entity_name}
-                      </td>
-                      <td className="p-2.5 text-slate-700 italic">
-                        "{log.justification}"
-                      </td>
+          {/* TAB 4: BITÁCORA DE AUDITORÍA */}
+          {activeTab === 'auditoria' && (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Bitácora Inmutable de Auditoría (Audit Logs)</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Trazabilidad jurídica: cada ajuste exige usuario, rol, fecha, valores y justificación obligatoria
+                  </p>
+                </div>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono font-bold border border-slate-200">
+                  Append-Only (No Modificable)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                      <th className="p-2.5">Fecha y Hora</th>
+                      <th className="p-2.5">Usuario / Rol</th>
+                      <th className="p-2.5">Organización</th>
+                      <th className="p-2.5">Acción</th>
+                      <th className="p-2.5">Parámetro</th>
+                      <th className="p-2.5">Justificación Registrada</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {logs.map(log => (
+                      <tr key={log.id} className="hover:bg-slate-50/80">
+                        <td className="p-2.5 text-slate-500 font-mono whitespace-nowrap">
+                          {new Date(log.created_at).toLocaleString('es-BO')}
+                        </td>
+                        <td className="p-2.5 font-medium text-slate-900 whitespace-nowrap">
+                          {log.user_email}
+                          <span className="block text-[10px] text-blue-600 font-mono">{log.user_role}</span>
+                        </td>
+                        <td className="p-2.5 text-slate-600 whitespace-nowrap">
+                          {log.user_organization}
+                        </td>
+                        <td className="p-2.5 whitespace-nowrap">
+                          <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded font-semibold">
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-mono text-slate-800 whitespace-nowrap">
+                          {log.field_name || log.entity_name}
+                        </td>
+                        <td className="p-2.5 text-slate-700 italic">
+                          "{log.justification}"
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+        </main>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 📄 DOSSIER TÉCNICO OFICIAL DE IMPRESIÓN / PDF (SOLO VISIBLE AL EXPORTAR) */}
+      {/* ========================================================================= */}
+      <div className="hidden print:block p-8 font-sans bg-white text-slate-900">
+        
+        {/* Encabezado Oficial GAMS & Ecotraffic */}
+        <div className="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-black uppercase tracking-widest text-slate-700">ESTADO PLURINACIONAL DE BOLIVIA</span>
+            </div>
+            <h1 className="text-xl font-black text-slate-950">GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE</h1>
+            <p className="text-xs text-slate-700 font-bold uppercase tracking-tight">DIRECCIÓN DE TRÁFICO, TRANSPORTE Y VIALIDAD</p>
+            <p className="text-sm font-black text-blue-950 mt-2">
+              DOSSIER TÉCNICO OFICIAL DE GOBERNANZA TARIFARIA — ESCENARIO {selectedScenario.toUpperCase()}
+            </p>
+          </div>
+          <div className="text-right text-xs text-slate-700">
+            <span className="font-black text-slate-950">CONSULTORÍA: ECOTRAFFIC</span><br/>
+            <span>Código de Sesión: {params.session_id.slice(0, 8).toUpperCase()}</span><br/>
+            <span>Fecha de Dictamen: {new Date().toLocaleDateString('es-BO')}</span><br/>
+            <span>Sucre, Chuquisaca, Bolivia</span>
+          </div>
+        </div>
+
+        {/* Dictamen Resumen */}
+        <div className="space-y-4 text-xs">
+          
+          <div className="p-4 bg-slate-50 border-2 border-slate-300 rounded-xl space-y-1">
+            <div className="font-black text-slate-900 text-sm">DICTAMEN TÉCNICO DE EQUILIBRIO FINANCIERO:</div>
+            <p className="text-slate-800 leading-relaxed">
+              La tarifa oficial acordada para la categoría <strong>Adulto de Bs. {fmt(activeAdultFare, 2)}</strong> representa una tarifa ponderada de red de <strong>Bs. {fmt(activeWeightedFare, 4)}</strong>. Esta recaudación cubre el <strong>100% del costo regulatorio mensual de Bs. {fmt(regulatoryCost, 2)}</strong> (OPEX Bs. {fmt(opex, 2)} + Reposición de Flota Bs. {fmt(depreciation, 2)} + Retorno WACC 11% Bs. {fmt(allowedReturn, 2)}), garantizando un ingreso digno al operador de <strong>Bs. {fmt(householdIncome, 0)}/mes</strong> y preservando el poder adquisitivo ciudadano.
+            </p>
+          </div>
+
+          {/* Cuadro Resumen Econométrico */}
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="p-2 border border-slate-400 rounded bg-slate-50">
+              <div className="text-[10px] text-slate-500 font-bold">TARIFA ADULTO</div>
+              <div className="text-base font-black text-slate-950">Bs. {fmt(activeAdultFare, 2)}</div>
+            </div>
+            <div className="p-2 border border-slate-400 rounded bg-slate-50">
+              <div className="text-[10px] text-slate-500 font-bold">TARIFA TÉCNICA EQ.</div>
+              <div className="text-base font-black text-slate-950">Bs. 3,45</div>
+            </div>
+            <div className="p-2 border border-slate-400 rounded bg-slate-50">
+              <div className="text-[10px] text-slate-500 font-bold">INGRESO HOGAR / MES</div>
+              <div className="text-base font-black text-slate-950">Bs. {fmt(householdIncome, 0)}</div>
+            </div>
+            <div className="p-2 border border-slate-400 rounded bg-slate-50">
+              <div className="text-[10px] text-slate-500 font-bold">UTILIDAD EXCEDENTE</div>
+              <div className="text-base font-black text-emerald-900">+Bs. {fmt(economicProfit, 0)}</div>
             </div>
           </div>
-        )}
 
-      </main>
+          {/* Matriz Tarifaria Oficial */}
+          <div>
+            <div className="font-bold text-slate-900 mb-1">1. Matriz de Tarifas por Categoría Social:</div>
+            <table className="w-full border-collapse border border-slate-400 text-xs">
+              <thead>
+                <tr className="bg-slate-200 text-slate-900 font-bold">
+                  <th className="border border-slate-400 p-1.5 text-left">Categoría de Pasajero</th>
+                  <th className="border border-slate-400 p-1.5 text-right">% Demanda</th>
+                  <th className="border border-slate-400 p-1.5 text-right">Viajes / Día</th>
+                  <th className="border border-slate-400 p-1.5 text-right">Tarifa Vigente (Bs)</th>
+                  <th className="border border-slate-400 p-1.5 text-right">Tarifa Técnica Eq. (Bs)</th>
+                  <th className="border border-slate-400 p-1.5 text-right bg-slate-300 font-black">Tarifa Social Oficial (Bs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fares.map(f => (
+                  <tr key={f.name}>
+                    <td className="border border-slate-400 p-1.5 font-semibold">{f.name}</td>
+                    <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt(f.demand_share * 100, 1)}%</td>
+                    <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt(f.daily_trips, 0)}</td>
+                    <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
+                    <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
+                    <td className="border border-slate-400 p-1.5 text-right font-mono font-bold bg-slate-100">
+                      Bs. {fmt(selectedScenario === 'social1' ? f.fare_social_1_bs : f.fare_social_2_bs, 2)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-slate-100 font-bold border-t-2 border-slate-900">
+                  <td className="border border-slate-400 p-1.5">PROMEDIO PONDERADO DE RED</td>
+                  <td className="border border-slate-400 p-1.5 text-right">100%</td>
+                  <td className="border border-slate-400 p-1.5 text-right">{fmt(demandDay, 0)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right">Bs. {fmt(currentWeighted, 4)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right">Bs. {fmt(technicalWeighted, 4)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-black bg-slate-200">Bs. {fmt(activeWeightedFare, 4)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Desglose de Costos de Operación Vehicular (COV) */}
+          <div className="pt-2">
+            <div className="font-bold text-slate-900 mb-1">2. Estructura Mensual del Costo Regulatorio por Unidad (Nissan Civilian):</div>
+            <table className="w-full border-collapse border border-slate-400 text-xs">
+              <tbody>
+                <tr>
+                  <td className="border border-slate-400 p-1.5 font-semibold">Combustible Diésel (Rendimiento 5.5 km/l + 15% congestión)</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(fuelCost, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt((fuelCost / regulatoryCost) * 100, 1)}%</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-1.5 font-semibold">Mantenimiento Auditado v2 (Planilla oficial 52 ítems)</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(params.maintenance_monthly_bs, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt((params.maintenance_monthly_bs / regulatoryCost) * 100, 1)}%</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-1.5 font-semibold">Costo Laboral Chofer Profesional (Sueldo Bs. 3.300 + 8.33% aguinaldo)</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(laborCost, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt((laborCost / regulatoryCost) * 100, 1)}%</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-1.5 font-semibold">Costos Administrativos, Seguros e Inspecciones</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(otherFixed, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt((otherFixed / regulatoryCost) * 100, 1)}%</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-1.5 font-semibold">Reserva de Reposición Vehicular (Vida útil 10 años)</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(depreciation, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt((depreciation / regulatoryCost) * 100, 1)}%</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-400 p-1.5 font-semibold">Retorno Justo al Capital Invertido (WACC 11% Anual)</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">Bs. {fmt(allowedReturn, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono">{fmt((allowedReturn / regulatoryCost) * 100, 1)}%</td>
+                </tr>
+                <tr className="bg-slate-200 font-bold border-t-2 border-slate-900 text-slate-950">
+                  <td className="border border-slate-400 p-1.5 font-black">COSTO ECONÓMICO REGULATORIO TOTAL</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono font-black">Bs. {fmt(regulatoryCost, 2)}</td>
+                  <td className="border border-slate-400 p-1.5 text-right font-mono font-black">100.0%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bloque Oficial de Firmas */}
+          <div className="pt-12 grid grid-cols-3 gap-6 text-center text-xs">
+            <div className="border-t border-slate-900 pt-2">
+              <strong>POR EL EJECUTIVO MUNICIPAL</strong><br/>
+              <span className="text-[11px] text-slate-600">Gobierno Autónomo Municipal de Sucre</span>
+            </div>
+            <div className="border-t border-slate-900 pt-2">
+              <strong>POR LA FEDERACIÓN DE CHOFERES</strong><br/>
+              <span className="text-[11px] text-slate-600">Sindicatos San Cristóbal y Sucre</span>
+            </div>
+            <div className="border-t border-slate-900 pt-2">
+              <strong>POR LA CONSULTORÍA TÉCNICA</strong><br/>
+              <span className="text-[11px] text-slate-600">Ecotraffic Consultoría</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 🔐 MODALES INTERACTIVOS DE AUTENTICACIÓN, EDICIÓN Y PANEL SUPERADMIN      */}
+      {/* ========================================================================= */}
+      
+      {/* Modal de Autenticación */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={(email, role, org) => {
+          setUserEmail(email);
+          setActiveRole(role);
+          setUserOrg(org);
+          setStatusMessage({ text: `Sesión iniciada como ${role} (${email})`, type: 'success' });
+        }}
+      />
+
+      {/* Panel de Gestión de Usuarios Admin & SuperAdmin */}
+      <AdminUsersPanel
+        isOpen={isAdminPanelOpen}
+        onClose={() => setIsAdminPanelOpen(false)}
+        currentUserRole={activeRole}
+        currentUserEmail={userEmail}
+      />
 
       {/* Modal de Edición de Parámetros */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
-            <div className="bg-slate-950 text-white px-5 py-4 flex justify-between items-center">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+            <div className="bg-slate-950 text-white px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-bold">Modificar Parámetro Oficial</h3>
                 <p className="text-[11px] text-slate-400">El cambio quedará registrado en la bitácora de auditoría</p>
@@ -935,12 +1182,12 @@ export default function DashboardView({
               </button>
             </div>
 
-            <form onSubmit={handleSaveParameter} className="p-5 space-y-4">
+            <form onSubmit={handleSaveParameter} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Parámetro Seleccionado:
                 </label>
-                <div className="p-2.5 bg-slate-100 rounded-lg text-xs font-mono font-bold text-slate-900">
+                <div className="p-2.5 bg-slate-100 rounded-xl text-xs font-mono font-bold text-slate-900">
                   {editField}
                 </div>
               </div>
@@ -955,7 +1202,7 @@ export default function DashboardView({
                   value={editValue}
                   onChange={e => setEditValue(Number(e.target.value))}
                   required
-                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-mono font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
 
@@ -969,7 +1216,7 @@ export default function DashboardView({
                   onChange={e => setJustification(e.target.value)}
                   placeholder="Fundamente el motivo o acuerdo de mesa para este ajuste..."
                   required
-                  className="w-full p-2.5 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                 />
                 <span className="text-[10px] text-slate-400 block mt-1">
                   Mínimo 10 caracteres requeridos para trazabilidad municipal.
@@ -980,14 +1227,14 @@ export default function DashboardView({
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition-all shadow-xs"
+                  className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition-all shadow-md active:scale-95"
                 >
                   {isSubmitting ? 'Guardando...' : 'Confirmar & Registrar Log'}
                 </button>
@@ -996,64 +1243,6 @@ export default function DashboardView({
           </div>
         </div>
       )}
-
-      {/* Print Dossier Layout (visible solo al imprimir / exportar PDF) */}
-      <div className="hidden print:block p-8 font-sans">
-        <div className="border-b-2 border-slate-900 pb-4 mb-6 flex justify-between items-start">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE</h1>
-            <p className="text-xs text-slate-600 font-semibold">DIRECCIÓN DE TRÁFICO, TRANSPORTE Y VIALIDAD</p>
-            <p className="text-sm font-bold text-blue-900 mt-2">
-              DOSSIER TÉCNICO OFICIAL DE CONCERTACIÓN TARIFARIA — ESCENARIO {selectedScenario.toUpperCase()}
-            </p>
-          </div>
-          <div className="text-right text-xs text-slate-600">
-            <strong>CONSULTORÍA: ECOTRAFFIC</strong><br/>
-            Fecha: {new Date().toLocaleDateString('es-BO')}<br/>
-            Sucre, Bolivia
-          </div>
-        </div>
-
-        <div className="space-y-4 text-xs">
-          <div className="p-3 bg-slate-50 border border-slate-300 rounded">
-            <strong>DICTAMEN TÉCNICO DE EQUILIBRIO:</strong> La tarifa propuesta para adulto de <strong>Bs. {fmt(activeAdultFare, 2)}</strong> representa una tarifa ponderada de red de <strong>Bs. {fmt(activeWeightedFare, 4)}</strong>, cubriendo el 100% del costo regulatorio de <strong>Bs. {fmt(regulatoryCost, 2)}/mes</strong> (OPEX Bs. {fmt(opex, 2)} + Reposición Bs. {fmt(depreciation, 2)} + Retorno WACC 11% Bs. {fmt(allowedReturn, 2)}).
-          </div>
-
-          <table className="w-full border-collapse border border-slate-400 text-xs">
-            <thead>
-              <tr className="bg-slate-200">
-                <th className="border border-slate-400 p-2 text-left">Categoría</th>
-                <th className="border border-slate-400 p-2 text-right">% Demanda</th>
-                <th className="border border-slate-400 p-2 text-right">Tarifa Vigente (Bs)</th>
-                <th className="border border-slate-400 p-2 text-right">Tarifa Técnica Eq. (Bs)</th>
-                <th className="border border-slate-400 p-2 text-right">Tarifa Social Acordada (Bs)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fares.map(f => (
-                <tr key={f.name}>
-                  <td className="border border-slate-400 p-2 font-semibold">{f.name}</td>
-                  <td className="border border-slate-400 p-2 text-right">{fmt(f.demand_share * 100, 1)}%</td>
-                  <td className="border border-slate-400 p-2 text-right">Bs. {fmt(f.fare_current_bs, 2)}</td>
-                  <td className="border border-slate-400 p-2 text-right">Bs. {fmt(f.fare_technical_bs, 4)}</td>
-                  <td className="border border-slate-400 p-2 text-right font-bold">Bs. {fmt(f.fare_social_2_bs, 2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="pt-16 grid grid-cols-2 gap-12 text-center text-xs">
-            <div className="border-t border-slate-800 pt-2">
-              <strong>POR EL EJECUTIVO MUNICIPAL</strong><br/>
-              Gobierno Autónomo Municipal de Sucre
-            </div>
-            <div className="border-t border-slate-800 pt-2">
-              <strong>POR LA FEDERACIÓN DE CHOFERES</strong><br/>
-              Sindicatos San Cristóbal y Sucre
-            </div>
-          </div>
-        </div>
-      </div>
 
     </div>
   );
