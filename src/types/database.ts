@@ -102,6 +102,14 @@ export interface NetworkRoute {
   created_at: string;
 }
 
+export type Json = 
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export interface AuditLog {
   id: string;
   session_id?: string;
@@ -113,10 +121,11 @@ export interface AuditLog {
   entity_name: string;
   entity_id?: string;
   field_name?: string;
-  old_value: any;
-  new_value: any;
+  old_value: Record<string, Json> | Json;
+  new_value: Record<string, Json> | Json;
   justification: string;
   ip_address?: string;
   user_agent?: string;
   created_at: string;
 }
+

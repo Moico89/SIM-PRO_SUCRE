@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import type { SystemParameters, FareCategory, AuditLog, UserRole } from '@/types/database';
 import { updateSystemParameter } from '@/actions/parameters';
+import { createClient } from '@/lib/supabase/client';
+import type { UpdateParameterInput } from '@/lib/validations/parameters';
 
 interface DashboardViewProps {
   initialParameters: SystemParameters;
@@ -12,6 +14,10 @@ interface DashboardViewProps {
   currentUserEmail: string;
 }
 
+type EditableParameterField = UpdateParameterInput['field'];
+type ScenarioType = 'social2' | 'social1' | 'technical' | 'current' | 'stress';
+type TabType = 'resumen' | 'tarifas' | 'rutas' | 'auditoria';
+
 export default function DashboardView({
   initialParameters,
   initialFares,
@@ -20,16 +26,19 @@ export default function DashboardView({
   currentUserEmail = 'consultor@ecotraffic.com.bo'
 }: DashboardViewProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'resumen' | 'tarifas' | 'rutas' | 'auditoria'>('resumen');
+  const [activeTab, setActiveTab] = useState<TabType>('resumen');
   const [params, setParams] = useState<SystemParameters>(initialParameters);
   const [fares, setFares] = useState<FareCategory[]>(initialFares);
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs);
-  const [selectedScenario, setSelectedScenario] = useState<'social2' | 'social1' | 'technical' | 'current' | 'stress'>('social2');
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioType>('social2');
   const [activeRole, setActiveRole] = useState<UserRole>(currentRole);
+
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'offline'>('connecting');
+  const [, startTransition] = useTransition();
   
   // Modal de edición de parámetros
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editField, setEditField] = useState<keyof SystemParameters>('fuel_price_bs_l');
+  const [editField, setEditField] = useState<EditableParameterField>('fuel_price_bs_l');
   const [editValue, setEditValue] = useState<number>(params.fuel_price_bs_l);
   const [justification, setJustification] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,6 +47,82 @@ export default function DashboardView({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Suscripción en Tiempo Real con Supabase WebSockets
+  useEffect(() => {
+    try {
+      const supabase = createClient();
+      const channel = supabase
+        .channel(`negotiation-live-${params.session_id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'system_parameters',
+            filter: `session_id=eq.${params.session_id}`,
+          },
+          (payload) => {
+            if (payload.new) {
+              startTransition(() => {
+                setParams((prev) => ({ ...prev, ...(payload.new as Partial<SystemParameters>) }));
+              });
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'fare_categories',
+            filter: `session_id=eq.${params.session_id}`,
+          },
+          (payload) => {
+            if (payload.new) {
+              const updated = payload.new as FareCategory;
+              startTransition(() => {
+                setFares((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+              });
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'audit_logs',
+            filter: `session_id=eq.${params.session_id}`,
+          },
+          (payload) => {
+            if (payload.new) {
+              const newLog = payload.new as AuditLog;
+              startTransition(() => {
+                setLogs((prev) => {
+                  if (prev.some((l) => l.id === newLog.id)) return prev;
+                  return [newLog, ...prev];
+                });
+              });
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setRealtimeStatus('connected');
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setRealtimeStatus('offline');
+          }
+        });
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      setRealtimeStatus('offline');
+    }
+  }, [params.session_id]);
+
 
   // Formateador seguro contra errores de hidratación SSR
   const fmt = (num: number, decimals: number = 0) => {
@@ -168,8 +253,7 @@ export default function DashboardView({
   // Manejo de exportación a Excel dinámico
   const handleExportExcel = () => {
     try {
-      // Si SheetJS está cargado en window
-      const XLSX = (window as any).XLSX;
+      const XLSX = window.XLSX;
       if (XLSX) {
         const wb = XLSX.utils.book_new();
         
@@ -219,7 +303,7 @@ export default function DashboardView({
         // Redirigir a descarga directa del archivo master de Google Drive
         window.open("https://drive.google.com/file/d/1IjhXzM7y1Awv6ONity8ckblUCdkxCEOg/view?usp=drivesdk", "_blank");
       }
-    } catch (e) {
+    } catch {
       window.open("https://drive.google.com/file/d/1IjhXzM7y1Awv6ONity8ckblUCdkxCEOg/view?usp=drivesdk", "_blank");
     }
   };
@@ -229,7 +313,7 @@ export default function DashboardView({
     window.print();
   };
 
-  const handleOpenEdit = (field: keyof SystemParameters, currentValue: number) => {
+  const handleOpenEdit = (field: EditableParameterField, currentValue: number) => {
     if (!canEdit) {
       alert(`Acceso denegado: El rol '${activeRole}' no tiene permisos para modificar parámetros oficiales.`);
       return;
@@ -253,7 +337,7 @@ export default function DashboardView({
     const res = await updateSystemParameter({
       sessionId: params.session_id,
       parameterId: params.id,
-      field: editField as any,
+      field: editField,
       newValue: Number(editValue),
       justification: justification
     });
@@ -316,6 +400,20 @@ export default function DashboardView({
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Indicador de Estado Realtime / WebSockets */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-slate-900 border-slate-700">
+              <span className={`w-2 h-2 rounded-full ${
+                realtimeStatus === 'connected' 
+                  ? 'bg-emerald-400 animate-pulse' 
+                  : realtimeStatus === 'connecting'
+                  ? 'bg-amber-400 animate-pulse'
+                  : 'bg-slate-400'
+              }`} />
+              <span className="text-slate-300">
+                {realtimeStatus === 'connected' ? 'En Vivo' : realtimeStatus === 'connecting' ? 'Conectando...' : 'Offline'}
+              </span>
+            </div>
+
             {/* Botón Descargar PDF */}
             <button
               onClick={handleExportPDF}
@@ -390,15 +488,15 @@ export default function DashboardView({
           {/* Segmented Control de Escenarios */}
           <div className="bg-slate-100 p-1.5 rounded-xl flex flex-wrap gap-1 border border-slate-200">
             {[
-              { id: 'social2', label: 'Social 2 (Bs. 3,50)', badge: 'RECOMENDADO', color: 'text-emerald-700 font-extrabold' },
-              { id: 'social1', label: 'Social 1 (Bs. 3,80)', badge: '', color: 'text-slate-700' },
-              { id: 'technical', label: 'Técnica (Bs. 3,45)', badge: 'EQUILIBRIO', color: 'text-blue-700' },
-              { id: 'current', label: 'Vigente (Bs. 4,50)', badge: '', color: 'text-slate-700' },
-              { id: 'stress', label: 'Estrés (-10% / +15%)', badge: '', color: 'text-amber-700' }
+              { id: 'social2' as const, label: 'Social 2 (Bs. 3,50)', badge: 'RECOMENDADO', color: 'text-emerald-700 font-extrabold' },
+              { id: 'social1' as const, label: 'Social 1 (Bs. 3,80)', badge: '', color: 'text-slate-700' },
+              { id: 'technical' as const, label: 'Técnica (Bs. 3,45)', badge: 'EQUILIBRIO', color: 'text-blue-700' },
+              { id: 'current' as const, label: 'Vigente (Bs. 4,50)', badge: '', color: 'text-slate-700' },
+              { id: 'stress' as const, label: 'Estrés (-10% / +15%)', badge: '', color: 'text-amber-700' }
             ].map(sc => (
               <button
                 key={sc.id}
-                onClick={() => setSelectedScenario(sc.id as any)}
+                onClick={() => setSelectedScenario(sc.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                   selectedScenario === sc.id
                     ? 'bg-white text-slate-950 shadow-sm border border-slate-200/80'
@@ -509,14 +607,14 @@ export default function DashboardView({
         {/* SaaS Navigation Tabs */}
         <div className="flex border-b border-slate-200 gap-6">
           {[
-            { id: 'resumen', label: 'Resumen Ejecutivo & COV' },
-            { id: 'tarifas', label: 'Estructura por Categoría Social' },
-            { id: 'rutas', label: `Rentabilidad 32 Rutas (${deficitRoutesCount} deficitarias)` },
-            { id: 'auditoria', label: `Bitácora de Auditoría (${logs.length} logs)` }
+            { id: 'resumen' as const, label: 'Resumen Ejecutivo & COV' },
+            { id: 'tarifas' as const, label: 'Estructura por Categoría Social' },
+            { id: 'rutas' as const, label: `Rentabilidad 32 Rutas (${deficitRoutesCount} deficitarias)` },
+            { id: 'auditoria' as const, label: `Bitácora de Auditoría (${logs.length} logs)` }
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`pb-3 text-xs font-bold transition-all relative ${
                 activeTab === tab.id
                   ? 'text-blue-700 border-b-2 border-blue-700'
@@ -547,18 +645,18 @@ export default function DashboardView({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {[
-                  { key: 'fuel_price_bs_l', label: 'Precio Diésel', val: params.fuel_price_bs_l, unit: 'Bs/litro' },
-                  { key: 'fuel_efficiency_km_l', label: 'Rendimiento Diésel Base', val: params.fuel_efficiency_km_l, unit: 'km/l (+15% ralentí)' },
-                  { key: 'maintenance_monthly_bs', label: 'Mantenimiento Mensual v2', val: params.maintenance_monthly_bs, unit: 'Bs/mes (-32,7%)' },
-                  { key: 'driver_salary_bs', label: 'Salario Chofer Profesional', val: params.driver_salary_bs, unit: 'Bs/mes (+8,33% aguinaldo)' },
-                  { key: 'fleet_active', label: 'Flota Activa en Servicio', val: params.fleet_active, unit: 'microbuses' },
-                  { key: 'turns_day', label: 'Vueltas por Día / Unidad', val: params.turns_day, unit: 'vueltas/día' },
-                  { key: 'demand_network_day', label: 'Demanda Diaria Total', val: params.demand_network_day, unit: 'pasajeros/día' },
-                  { key: 'km_network_day', label: 'Producción de Red (GPS)', val: params.km_network_day, unit: 'km/día' }
+                  { key: 'fuel_price_bs_l' as const, label: 'Precio Diésel', val: params.fuel_price_bs_l, unit: 'Bs/litro' },
+                  { key: 'fuel_efficiency_km_l' as const, label: 'Rendimiento Diésel Base', val: params.fuel_efficiency_km_l, unit: 'km/l (+15% ralentí)' },
+                  { key: 'maintenance_monthly_bs' as const, label: 'Mantenimiento Mensual v2', val: params.maintenance_monthly_bs, unit: 'Bs/mes (-32,7%)' },
+                  { key: 'driver_salary_bs' as const, label: 'Salario Chofer Profesional', val: params.driver_salary_bs, unit: 'Bs/mes (+8,33% aguinaldo)' },
+                  { key: 'fleet_active' as const, label: 'Flota Activa en Servicio', val: params.fleet_active, unit: 'microbuses' },
+                  { key: 'turns_day' as const, label: 'Vueltas por Día / Unidad', val: params.turns_day, unit: 'vueltas/día' },
+                  { key: 'demand_network_day' as const, label: 'Demanda Diaria Total', val: params.demand_network_day, unit: 'pasajeros/día' },
+                  { key: 'km_network_day' as const, label: 'Producción de Red (GPS)', val: params.km_network_day, unit: 'km/día' }
                 ].map(item => (
                   <div
                     key={item.key}
-                    onClick={() => canEdit && handleOpenEdit(item.key as any, item.val)}
+                    onClick={() => canEdit && handleOpenEdit(item.key, item.val)}
                     className={`p-3 rounded-xl border flex justify-between items-center transition-all ${
                       canEdit
                         ? 'border-slate-200/80 hover:border-blue-500 hover:bg-blue-50/30 cursor-pointer shadow-2xs'
