@@ -19,6 +19,8 @@ export type AuditActionType =
   | 'DELETE'
   | 'CAMBIO_PARAMETRO'
   | 'CAMBIO_TARIFA'
+  | 'CREACION_ESCENARIO'
+  | 'EDICION_ESCENARIO'
   | 'BLOQUEO_SESION'
   | 'DESBLOQUEO_SESION'
   | 'LOGIN'
