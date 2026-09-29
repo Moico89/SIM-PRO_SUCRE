@@ -105,6 +105,7 @@ export default function DashboardView({
     currentUserEmail === 'ecotraffic.bo@gmail.com' ? 'Ecotraffic Consultoría' : 'GAM Sucre'
   );
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -678,10 +679,18 @@ export default function DashboardView({
     return (
       <>
         <LandingPage
-          onOpenLogin={() => setIsAuthModalOpen(true)}
+          onOpenLogin={() => {
+            setAuthModalTab('login');
+            setIsAuthModalOpen(true);
+          }}
+          onOpenDemo={() => {
+            setAuthModalTab('register');
+            setIsAuthModalOpen(true);
+          }}
         />
         <AuthModal
           isOpen={isAuthModalOpen}
+          initialTab={authModalTab}
           onClose={() => setIsAuthModalOpen(false)}
           onAuthSuccess={handleAuthSuccess}
         />

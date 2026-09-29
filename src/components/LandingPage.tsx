@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 
 interface LandingPageProps {
   onOpenLogin: () => void;
+  onOpenDemo?: () => void;
 }
 
-export default function LandingPage({ onOpenLogin }: LandingPageProps) {
+export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProps) {
+  const handleDemoClick = onOpenDemo || onOpenLogin;
   const [activeNav, setActiveNav] = useState('inicio');
   const [emailNewsletter, setEmailNewsletter] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
@@ -101,7 +103,7 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
               Iniciar Sesión
             </button>
             <button
-              onClick={onOpenLogin}
+              onClick={handleDemoClick}
               className="text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 px-5 py-2.5 rounded-lg shadow-sm shadow-blue-900/10 hover:shadow-md transition-all cursor-pointer"
             >
               Solicitar Demo
@@ -141,7 +143,7 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
 
               <div className="pt-2 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
                 <button
-                  onClick={onOpenLogin}
+                  onClick={handleDemoClick}
                   className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#0b1329] font-bold text-base shadow-lg shadow-cyan-500/30 hover:shadow-cyan-400/50 hover:scale-[1.02] transition-all cursor-pointer"
                 >
                   Solicitar una Demo Personalizada

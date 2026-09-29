@@ -1,9 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { Profile, UserRole, Tenant } from '@/types/database';
+import type { Profile, UserRole } from '@/types/database';
 import type { ScenarioConfig } from '@/types/scenario';
-import { getAllUsers, createAdminUserBySuperAdmin, toggleUserActiveStatus, updateUserRoleBySuperAdmin } from '@/actions/auth';
+import { 
+  getAllUsers, 
+  createAdminUserBySuperAdmin, 
+  toggleUserActiveStatus, 
+  updateUserRoleBySuperAdmin,
+  updateUserBySuperAdmin,
+  deleteUserBySuperAdmin
+} from '@/actions/auth';
 import { OFFICIAL_TENANTS } from '@/lib/tenants';
 
 interface AdminUsersPanelProps {
@@ -80,8 +87,9 @@ export default function AdminUsersPanel({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'tenants' | 'scenarios'>('list');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   
-  // Form de nuevo admin
+  // Form de nuevo usuario
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('Sucre2026*');
   const [newFullName, setNewFullName] = useState('');
@@ -90,6 +98,15 @@ export default function AdminUsersPanel({
   const [newRole, setNewRole] = useState<UserRole>('admin_municipal');
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Estado para editar usuario
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('admin_municipal');
+  const [editTenantId, setEditTenantId] = useState('');
+  const [editOrganization, setEditOrganization] = useState('');
+  const [editPassword, setEditPassword] = useState('');
 
   // Form de escenario dentro del panel
   const [editingScenario, setEditingScenario] = useState<ScenarioConfig | null>(null);
@@ -145,6 +162,7 @@ export default function AdminUsersPanel({
 
   if (!isOpen) return null;
 
+  // 1. CREAR NUEVO USUARIO EN CATEGORÍAS
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormSubmitting(true);
@@ -165,14 +183,12 @@ export default function AdminUsersPanel({
       updated_at: new Date().toISOString()
     };
 
-    // 1. Persistir inmediatamente en memoria y localStorage
-    setUsers(prev => {
-      const updated = [newUser, ...prev.filter(u => u.email.toLowerCase() !== emailClean)];
-      try { localStorage.setItem('simpro_directory_users', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
+    // 1. Guardar en memoria y localStorage de directorio
+    const updatedList = [newUser, ...users.filter(u => u.email.toLowerCase() !== emailClean)];
+    setUsers(updatedList);
+    try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedList)); } catch {}
 
-    // 2. Guardar credencial personalizada para autenticación instantánea
+    // 2. Guardar credencial personalizada para autenticación directa
     try {
       const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
       creds[emailClean] = {
@@ -180,7 +196,7 @@ export default function AdminUsersPanel({
         organization: newOrganization || assignedTenant.name,
         tenant_id: assignedTenant.id,
         fullName: newFullName.trim(),
-        password: newPassword
+        password: newPassword || 'Sucre2026*'
       };
       localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
     } catch {}
@@ -189,7 +205,7 @@ export default function AdminUsersPanel({
     try {
       await createAdminUserBySuperAdmin({
         email: emailClean,
-        password: newPassword,
+        password: newPassword || 'Sucre2026*',
         fullName: newFullName.trim(),
         organization: newOrganization || assignedTenant.name,
         tenantId: assignedTenant.id,
@@ -199,7 +215,7 @@ export default function AdminUsersPanel({
 
     setFormSubmitting(false);
     setActionMessage({ 
-      text: `Usuario ${newRole.toUpperCase()} '${newFullName.trim()}' (${emailClean}) creado y asignado a '${assignedTenant.short_name}' exitosamente.`, 
+      text: `Usuario ${newRole.toUpperCase()} '${newFullName.trim()}' (${emailClean}) creado y autorizado exitosamente en '${assignedTenant.short_name}'.`, 
       type: 'success' 
     });
     setNewEmail('');
@@ -207,20 +223,151 @@ export default function AdminUsersPanel({
     setActiveTab('list');
   };
 
+  // 2. ABRIR MODAL / FORM DE EDICIÓN
+  const startEditUser = (user: Profile) => {
+    setEditingUser(user);
+    setEditFullName(user.full_name);
+    setEditEmail(user.email);
+    setEditRole(user.role);
+    setEditTenantId(user.tenant_id || 'tenant-gams-sucre');
+    setEditOrganization(user.organization);
+    setEditPassword('');
+  };
+
+  // 3. GUARDAR EDICIÓN DE USUARIO
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setFormSubmitting(true);
+    setActionMessage(null);
+
+    const oldEmail = editingUser.email.toLowerCase().trim();
+    const newEmailClean = editEmail.toLowerCase().trim();
+    const assignedTenant = OFFICIAL_TENANTS.find(t => t.id === editTenantId) || OFFICIAL_TENANTS[0];
+
+    const updatedUser: Profile = {
+      ...editingUser,
+      full_name: editFullName.trim(),
+      email: newEmailClean,
+      role: editRole,
+      tenant_id: assignedTenant.id,
+      organization: editOrganization.trim() || assignedTenant.name,
+      updated_at: new Date().toISOString()
+    };
+
+    // Actualizar lista en estado y localStorage
+    const updatedUsers = users.map(u => u.id === editingUser.id ? updatedUser : u);
+    setUsers(updatedUsers);
+    try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedUsers)); } catch {}
+
+    // Actualizar en credenciales personalizadas
+    try {
+      const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
+      if (oldEmail !== newEmailClean) {
+        delete creds[oldEmail];
+      }
+      creds[newEmailClean] = {
+        role: editRole,
+        organization: editOrganization.trim() || assignedTenant.name,
+        tenant_id: assignedTenant.id,
+        fullName: editFullName.trim(),
+        password: editPassword || creds[oldEmail]?.password || 'Sucre2026*'
+      };
+      localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
+    } catch {}
+
+    // Servidor
+    try {
+      await updateUserBySuperAdmin({
+        userId: editingUser.id,
+        email: newEmailClean,
+        fullName: editFullName.trim(),
+        organization: editOrganization.trim() || assignedTenant.name,
+        role: editRole,
+        tenantId: assignedTenant.id,
+        password: editPassword || undefined
+      });
+    } catch {}
+
+    setFormSubmitting(false);
+    setEditingUser(null);
+    setActionMessage({
+      text: `Usuario '${editFullName.trim()}' (${newEmailClean}) actualizado correctamente con rol ${editRole.toUpperCase()}.`,
+      type: 'success'
+    });
+  };
+
+  // 4. ELIMINAR USUARIO
+  const handleDeleteUser = async (userId: string, userEmail: string, userName: string) => {
+    if (userEmail.toLowerCase() === 'ecotraffic.bo@gmail.com') {
+      setActionMessage({ text: 'No es posible eliminar la cuenta principal de SuperAdmin.', type: 'error' });
+      return;
+    }
+
+    if (!confirm(`¿Confirma eliminar definitivamente al usuario '${userName}' (${userEmail})?`)) {
+      return;
+    }
+
+    const emailClean = userEmail.toLowerCase().trim();
+    const updatedUsers = users.filter(u => u.id !== userId);
+    setUsers(updatedUsers);
+    try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedUsers)); } catch {}
+
+    try {
+      const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
+      delete creds[emailClean];
+      localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
+    } catch {}
+
+    try {
+      await deleteUserBySuperAdmin(userId);
+    } catch {}
+
+    setActionMessage({
+      text: `Usuario '${userName}' (${userEmail}) eliminado del sistema.`,
+      type: 'success'
+    });
+  };
+
+  // 5. ALTERNAR ESTADO ACTIVO / DESACTIVADO
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
     const updatedUsers = users.map(u => u.id === userId ? { ...u, is_active: !currentStatus } : u);
     setUsers(updatedUsers);
     try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedUsers)); } catch {}
     try { await toggleUserActiveStatus(userId, !currentStatus); } catch {}
+    setActionMessage({
+      text: `Estado actualizado a ${!currentStatus ? 'Activo' : 'Desactivado'}.`,
+      type: 'success'
+    });
   };
 
+  // 6. CAMBIO RÁPIDO DE ROL
   const handleRoleChange = async (userId: string, targetRole: UserRole) => {
+    const targetUser = users.find(u => u.id === userId);
     const updatedUsers = users.map(u => u.id === userId ? { ...u, role: targetRole } : u);
     setUsers(updatedUsers);
     try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedUsers)); } catch {}
+    
+    if (targetUser) {
+      try {
+        const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
+        const emailClean = targetUser.email.toLowerCase().trim();
+        if (creds[emailClean]) {
+          creds[emailClean].role = targetRole;
+          localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
+        }
+      } catch {}
+    }
+
     try { await updateUserRoleBySuperAdmin(userId, targetRole); } catch {}
+    setActionMessage({
+      text: `Rol modificado a ${targetRole.toUpperCase()}.`,
+      type: 'success'
+    });
   };
 
+  // Gestor de Escenarios
   const startEditScenario = (sc: ScenarioConfig) => {
     setIsCreatingScenario(false);
     setEditingScenario(sc);
@@ -278,15 +425,24 @@ export default function AdminUsersPanel({
     setActionMessage({ text: `Escenario '${scLabel}' guardado exitosamente.`, type: 'success' });
   };
 
+  // Filtrado de usuarios
+  const filteredUsers = users.filter(u => {
+    const matchesTenant = tenantFilter === 'all' || (u.tenant_id ? u.tenant_id === tenantFilter : (tenantFilter === 'tenant-gams-sucre' && u.organization.includes('GAM Sucre')));
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchesTenant && matchesRole;
+  });
+
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col font-sans">
         
-        {/* Header */}
+        {/* Header con vectores SVG - Cero emojis */}
         <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white p-6 flex justify-between items-center border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center font-black text-slate-950 text-lg shadow-md">
-              👑
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-slate-950 shadow-md">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 6c1.66 0 3 1.34 3 3 0 1.25-.77 2.31-1.86 2.74l1.36 4.26h-5l1.36-4.26C9.77 12.31 9 11.25 9 10c0-1.66 1.34-3 3-3z"/>
+              </svg>
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -295,12 +451,12 @@ export default function AdminUsersPanel({
                   {isSuperAdmin ? 'SuperAdmin Mode' : 'Admin Mode'}
                 </span>
               </div>
-              <p className="text-xs text-slate-300">Gestión de usuarios, auditoría RBAC y control de escenarios tarifarios</p>
+              <p className="text-xs text-slate-300">Gestión integral de usuarios, asignación de roles y control de escenarios</p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-2xl font-bold transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-800"
+            className="text-slate-400 hover:text-white text-2xl font-bold transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-800 cursor-pointer"
           >
             &times;
           </button>
@@ -312,15 +468,15 @@ export default function AdminUsersPanel({
             actionMessage.type === 'success' ? 'bg-emerald-50 text-emerald-900 border-b border-emerald-200' : 'bg-rose-50 text-rose-900 border-b border-rose-200'
           }`}>
             <span>{actionMessage.text}</span>
-            <button onClick={() => setActionMessage(null)}>&times;</button>
+            <button onClick={() => setActionMessage(null)} className="cursor-pointer font-bold text-sm">&times;</button>
           </div>
         )}
 
         {/* Tab Controls */}
         <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-3 gap-4 flex-wrap">
           <button
-            onClick={() => setActiveTab('list')}
-            className={`pb-3 text-xs font-bold transition-all relative ${
+            onClick={() => { setActiveTab('list'); setEditingUser(null); }}
+            className={`pb-3 text-xs font-bold transition-all relative cursor-pointer ${
               activeTab === 'list'
                 ? 'text-blue-700 border-b-2 border-blue-700'
                 : 'text-slate-500 hover:text-slate-800'
@@ -331,67 +487,105 @@ export default function AdminUsersPanel({
 
           {isSuperAdmin && (
             <button
-              onClick={() => setActiveTab('create')}
-              className={`pb-3 text-xs font-bold transition-all relative ${
+              onClick={() => { setActiveTab('create'); setEditingUser(null); }}
+              className={`pb-3 text-xs font-bold transition-all relative cursor-pointer ${
                 activeTab === 'create'
                   ? 'text-blue-700 border-b-2 border-blue-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              + Crear Administrador Nivel 1
+              + Agregar Usuario en Categorías
             </button>
           )}
 
           <button
-            onClick={() => setActiveTab('tenants')}
-            className={`pb-3 text-xs font-bold transition-all relative ${
+            onClick={() => { setActiveTab('tenants'); setEditingUser(null); }}
+            className={`pb-3 text-xs font-bold transition-all relative cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'tenants'
                 ? 'text-emerald-700 border-b-2 border-emerald-700'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            🏛️ Cuentas SaaS & Tenants ({OFFICIAL_TENANTS.length})
+            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+            Cuentas SaaS & Tenants ({OFFICIAL_TENANTS.length})
           </button>
 
           <button
-            onClick={() => setActiveTab('scenarios')}
-            className={`pb-3 text-xs font-bold transition-all relative ${
+            onClick={() => { setActiveTab('scenarios'); setEditingUser(null); }}
+            className={`pb-3 text-xs font-bold transition-all relative cursor-pointer flex items-center gap-1.5 ${
               activeTab === 'scenarios'
                 ? 'text-indigo-700 border-b-2 border-indigo-700'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            ⚡ Gestión de Escenarios ({scenarios.length})
+            <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Gestión de Escenarios ({scenarios.length})
           </button>
         </div>
 
         {/* Body Content */}
         <div className="p-6 overflow-y-auto flex-1">
-          {activeTab === 'list' && (
+          
+          {/* TAB 1: LISTADO Y GESTIÓN DE USUARIOS */}
+          {activeTab === 'list' && !editingUser && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600">Filtrar por Cuenta / Tenant:</span>
-                  <select
-                    value={tenantFilter}
-                    onChange={e => setTenantFilter(e.target.value)}
-                    className="p-1.5 border border-slate-300 rounded-xl text-xs bg-white font-medium outline-none"
-                  >
-                    <option value="all">Todos los Tenants</option>
-                    {OFFICIAL_TENANTS.map(t => (
-                      <option key={t.id} value={t.id}>{t.short_name}</option>
-                    ))}
-                  </select>
+              
+              {/* Filtros */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-600">Tenant:</span>
+                    <select
+                      value={tenantFilter}
+                      onChange={e => setTenantFilter(e.target.value)}
+                      className="p-1.5 border border-slate-300 rounded-xl text-xs bg-white font-medium outline-none"
+                    >
+                      <option value="all">Todos los Tenants</option>
+                      {OFFICIAL_TENANTS.map(t => (
+                        <option key={t.id} value={t.id}>{t.short_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-600">Categoría / Rol:</span>
+                    <select
+                      value={roleFilter}
+                      onChange={e => setRoleFilter(e.target.value)}
+                      className="p-1.5 border border-slate-300 rounded-xl text-xs bg-white font-medium outline-none"
+                    >
+                      <option value="all">Todos los Roles</option>
+                      <option value="superadmin">SuperAdmin</option>
+                      <option value="admin_municipal">Admin Municipal (GAMS)</option>
+                      <option value="consultor_ecotraffic">Consultor Ecotraffic</option>
+                      <option value="delegado_sindical">Delegado Sindical</option>
+                      <option value="observador_publico">Observador Ciudadano</option>
+                    </select>
+                  </div>
                 </div>
+
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setActiveTab('create')}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  >
+                    + Nuevo Usuario
+                  </button>
+                )}
               </div>
 
+              {/* Tabla de Usuarios */}
               <div className="overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
                       <th className="p-3">Usuario & Nombre</th>
                       <th className="p-3">Cuenta Tenant</th>
-                      <th className="p-3">Rol Asignado</th>
+                      <th className="p-3">Rol / Categoría</th>
                       <th className="p-3 text-center">Estado</th>
                       {isSuperAdmin && <th className="p-3 text-right">Acciones</th>}
                     </tr>
@@ -401,7 +595,11 @@ export default function AdminUsersPanel({
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-slate-400">Cargando directorio de usuarios...</td>
                       </tr>
-                    ) : users.filter(u => tenantFilter === 'all' || (u.tenant_id ? u.tenant_id === tenantFilter : (tenantFilter === 'tenant-gams-sucre' && u.organization.includes('GAM Sucre')))).map(u => (
+                    ) : filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400">No se encontraron usuarios con los filtros seleccionados.</td>
+                      </tr>
+                    ) : filteredUsers.map(u => (
                       <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{u.full_name}</div>
@@ -424,13 +622,14 @@ export default function AdminUsersPanel({
                               <option value="admin_municipal">Admin Municipal (GAMS)</option>
                               <option value="consultor_ecotraffic">Consultor Ecotraffic</option>
                               <option value="delegado_sindical">Delegado Sindical</option>
-                              <option value="observador_publico">Observador</option>
+                              <option value="observador_publico">Observador Ciudadano</option>
                             </select>
                           ) : (
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
                               u.role === 'superadmin' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                               u.role === 'admin_municipal' ? 'bg-blue-100 text-blue-900 border border-blue-300' :
                               u.role === 'consultor_ecotraffic' ? 'bg-teal-100 text-teal-900 border border-teal-300' :
+                              u.role === 'delegado_sindical' ? 'bg-purple-100 text-purple-900 border border-purple-300' :
                               'bg-slate-100 text-slate-700'
                             }`}>
                               {u.role.toUpperCase()}
@@ -446,18 +645,47 @@ export default function AdminUsersPanel({
                         </td>
                         {isSuperAdmin && (
                           <td className="p-3 text-right">
-                            {u.email !== 'ecotraffic.bo@gmail.com' && (
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Botón Editar */}
                               <button
-                                onClick={() => handleToggleStatus(u.id, u.is_active)}
-                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                                  u.is_active 
-                                    ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200' 
-                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                                }`}
+                                onClick={() => startEditUser(u)}
+                                title="Editar usuario"
+                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
                               >
-                                {u.is_active ? 'Desactivar' : 'Reactivar'}
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                </svg>
+                                Editar
                               </button>
-                            )}
+
+                              {/* Botón Desactivar / Reactivar */}
+                              {u.email !== 'ecotraffic.bo@gmail.com' && (
+                                <button
+                                  onClick={() => handleToggleStatus(u.id, u.is_active)}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                    u.is_active 
+                                      ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200' 
+                                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                  }`}
+                                >
+                                  {u.is_active ? 'Desactivar' : 'Activar'}
+                                </button>
+                              )}
+
+                              {/* Botón Eliminar */}
+                              {u.email !== 'ecotraffic.bo@gmail.com' && (
+                                <button
+                                  onClick={() => handleDeleteUser(u.id, u.email, u.full_name)}
+                                  title="Eliminar usuario"
+                                  className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                  </svg>
+                                  Borrar
+                                </button>
+                              )}
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -468,6 +696,230 @@ export default function AdminUsersPanel({
             </div>
           )}
 
+          {/* FORMULARIO DE EDICIÓN DE USUARIO */}
+          {editingUser && (
+            <form onSubmit={handleSaveEditUser} className="max-w-lg mx-auto space-y-4 bg-slate-50 p-6 rounded-2xl border border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Modificar Usuario</h3>
+                    <p className="text-[11px] text-slate-500 font-mono">{editingUser.email}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="text-xs text-slate-400 hover:text-slate-700 cursor-pointer font-bold"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo:</label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={e => setEditFullName(e.target.value)}
+                  required
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Correo Electrónico:</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={e => setEditEmail(e.target.value)}
+                  required
+                  disabled={editingUser.email === 'ecotraffic.bo@gmail.com'}
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Categoría / Rol Asignado:</label>
+                  <select
+                    value={editRole}
+                    onChange={e => setEditRole(e.target.value as UserRole)}
+                    disabled={editingUser.email === 'ecotraffic.bo@gmail.com'}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="superadmin">SuperAdmin</option>
+                    <option value="admin_municipal">Admin Municipal (GAMS)</option>
+                    <option value="consultor_ecotraffic">Consultor Ecotraffic</option>
+                    <option value="delegado_sindical">Delegado Sindical</option>
+                    <option value="observador_publico">Observador Ciudadano</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Cuenta Tenant Asignada:</label>
+                  <select
+                    value={editTenantId}
+                    onChange={e => {
+                      const tId = e.target.value;
+                      setEditTenantId(tId);
+                      const t = OFFICIAL_TENANTS.find(item => item.id === tId);
+                      if (t) setEditOrganization(t.name);
+                    }}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {OFFICIAL_TENANTS.map(t => (
+                      <option key={t.id} value={t.id}>{t.short_name} — {t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Organización / Entidad:</label>
+                <input
+                  type="text"
+                  value={editOrganization}
+                  onChange={e => setEditOrganization(e.target.value)}
+                  required
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Nueva Contraseña (dejar en blanco para mantener la actual):
+                </label>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={e => setEditPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={formSubmitting}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {formSubmitting ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB 2: AGREGAR NUEVO USUARIO EN CATEGORÍAS */}
+          {activeTab === 'create' && (
+            <form onSubmit={handleCreateUser} className="max-w-lg mx-auto space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 mb-2">Crear y Autorizar Usuario en Categoría</h3>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Cuenta / Tenant Asignado:</label>
+                <select
+                  value={selectedTenantId}
+                  onChange={e => {
+                    const tId = e.target.value;
+                    setSelectedTenantId(tId);
+                    const tenant = OFFICIAL_TENANTS.find(t => t.id === tId);
+                    if (tenant) setNewOrganization(tenant.name);
+                  }}
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {OFFICIAL_TENANTS.map(t => (
+                    <option key={t.id} value={t.id}>{t.short_name} — {t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo:</label>
+                <input
+                  type="text"
+                  value={newFullName}
+                  onChange={e => setNewFullName(e.target.value)}
+                  placeholder="Lic. María Rodríguez"
+                  required
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Correo Electrónico:</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  placeholder="usuario@sucre.bo o usuario@gmail.com"
+                  required
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Organización / Entidad:</label>
+                  <input
+                    type="text"
+                    value={newOrganization}
+                    onChange={e => setNewOrganization(e.target.value)}
+                    required
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Categoría / Rol:</label>
+                  <select
+                    value={newRole}
+                    onChange={e => setNewRole(e.target.value as UserRole)}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="superadmin">SuperAdmin</option>
+                    <option value="admin_municipal">Admin Municipal (GAMS)</option>
+                    <option value="consultor_ecotraffic">Consultor Ecotraffic</option>
+                    <option value="delegado_sindical">Delegado Sindical</option>
+                    <option value="observador_publico">Observador Ciudadano</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña de Acceso:</label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Sucre2026*"
+                  required
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={formSubmitting}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+              >
+                {formSubmitting ? 'Registrando en Directorio...' : 'Crear y Autorizar Usuario'}
+              </button>
+            </form>
+          )}
+
+          {/* TAB 3: CUENTAS SAAS & TENANTS */}
           {activeTab === 'tenants' && (
             <div className="space-y-4">
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
@@ -494,7 +946,10 @@ export default function AdminUsersPanel({
                     </div>
                     <div className="pt-2 flex justify-between items-center text-xs text-slate-600 border-t border-slate-100">
                       <span className="font-mono text-[11px]">ID: {t.slug}</span>
-                      <span className="font-semibold text-emerald-700">● 100% Operativo</span>
+                      <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        100% Operativo
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -502,349 +957,203 @@ export default function AdminUsersPanel({
             </div>
           )}
 
-          {activeTab === 'create' && (
-            <form onSubmit={handleCreateUser} className="max-w-lg mx-auto space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">Crear Nuevo Administrador Institucional</h3>
-              
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Cuenta / Tenant Asignado:</label>
-                <select
-                  value={selectedTenantId}
-                  onChange={e => {
-                    const tId = e.target.value;
-                    setSelectedTenantId(tId);
-                    const tenant = OFFICIAL_TENANTS.find(t => t.id === tId);
-                    if (tenant) setNewOrganization(tenant.name);
-                  }}
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {OFFICIAL_TENANTS.map(t => (
-                    <option key={t.id} value={t.id}>{t.short_name} — {t.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo:</label>
-                <input
-                  type="text"
-                  value={newFullName}
-                  onChange={e => setNewFullName(e.target.value)}
-                  placeholder="Lic. Rolando Párraga"
-                  required
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Correo Electrónico (Gmail / Institucional):</label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={e => setNewEmail(e.target.value)}
-                  placeholder="rolandoparraga@gmail.com"
-                  required
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Organización / Entidad:</label>
-                  <input
-                    type="text"
-                    value={newOrganization}
-                    onChange={e => setNewOrganization(e.target.value)}
-                    required
-                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nivel de Rol:</label>
-                  <select
-                    value={newRole}
-                    onChange={e => setNewRole(e.target.value as UserRole)}
-                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="admin_municipal">Admin Nivel 1 (GAMS)</option>
-                    <option value="consultor_ecotraffic">Consultor Técnico (Ecotraffic)</option>
-                    <option value="delegado_sindical">Delegado Sindical</option>
-                    <option value="observador_publico">Observador</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña Inicial:</label>
-                <input
-                  type="text"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={formSubmitting}
-                className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black rounded-xl shadow-md disabled:opacity-50 transition-all cursor-pointer"
-              >
-                {formSubmitting ? 'Creando y Autorizando...' : 'Autorizar y Crear Administrador'}
-              </button>
-            </form>
-          )}
-
+          {/* TAB 4: GESTIÓN DE ESCENARIOS */}
           {activeTab === 'scenarios' && (
             <div className="space-y-4">
-              {!isCreatingScenario && !editingScenario ? (
-                <>
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-700 uppercase">Control de Escenarios Tarifarios</h3>
-                      <p className="text-[11px] text-slate-500">Activar, editar parámetros, eliminar o calibrar nuevas propuestas</p>
-                    </div>
-                    <button
-                      onClick={startCreateScenario}
-                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
-                    >
-                      + Crear Nuevo Escenario
-                    </button>
-                  </div>
+              <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-200">
+                <div>
+                  <h3 className="text-xs font-bold text-indigo-950 uppercase">Gestor Oficial de Escenarios Tarifarios</h3>
+                  <p className="text-[11px] text-indigo-800">Cree, calibre o elimine propuestas de concertación socioeconómica.</p>
+                </div>
+                {isSuperAdmin && !editingScenario && !isCreatingScenario && (
+                  <button
+                    onClick={startCreateScenario}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  >
+                    + Nuevo Escenario
+                  </button>
+                )}
+              </div>
 
-                  <div className="space-y-3">
-                    {scenarios.map(sc => {
-                      const isActive = activeScenarioId === sc.id;
-                      return (
-                        <div
-                          key={sc.id}
-                          className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${
-                            isActive ? 'border-indigo-500 bg-indigo-50/70 shadow-xs' : 'border-slate-200 bg-slate-50/80 hover:bg-white'
-                          }`}
-                        >
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-extrabold text-sm text-slate-900">{sc.label}</span>
-                              {isActive && (
-                                <span className="text-[10px] bg-indigo-600 text-white px-2.5 py-0.5 rounded-full font-black animate-pulse">
-                                  ACTIVO
-                                </span>
-                              )}
-                              {sc.badge && !isActive && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                                  {sc.badge}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-slate-600 font-mono mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                              <span>Adulto: <strong>Bs. {sc.adultFare.toFixed(2)}</strong></span>
-                              <span>Mayores: <strong>Bs. {sc.socialFares.adultosMayores.toFixed(2)}</strong></span>
-                              <span>Univ: <strong>Bs. {sc.socialFares.universitarios.toFixed(2)}</strong></span>
-                              <span>Demanda: <strong>{(sc.demandFactor * 100).toFixed(0)}%</strong></span>
-                              <span>Diésel: <strong>{(sc.fuelPriceFactor * 100).toFixed(0)}%</strong></span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                            {isActive ? (
-                              <button
-                                onClick={() => onSelectScenario && onSelectScenario('technical')}
-                                className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                              >
-                                Desactivar
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => onSelectScenario && onSelectScenario(sc.id)}
-                                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-                              >
-                                Activar
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => startEditScenario(sc)}
-                              className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                            >
-                              Editar
-                            </button>
-
-                            {scenarios.length > 1 && (
-                              <button
-                                onClick={() => {
-                                  if (confirm(`¿Eliminar escenario '${sc.label}'?`)) {
-                                    onDeleteScenario && onDeleteScenario(sc.id);
-                                  }
-                                }}
-                                className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                              >
-                                Eliminar
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <form onSubmit={handleSaveScenarioSubmit} className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+              {(editingScenario || isCreatingScenario) ? (
+                <form onSubmit={handleSaveScenarioSubmit} className="bg-slate-50 p-5 rounded-2xl border border-indigo-200 space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {isCreatingScenario ? 'Crear Nuevo Escenario Tarifario' : `Editar: ${editingScenario?.label}`}
-                    </h3>
+                    <h4 className="text-xs font-bold text-indigo-900 uppercase">
+                      {editingScenario ? `Editando: ${editingScenario.label}` : 'Crear Nueva Propuesta Tarifaria'}
+                    </h4>
                     <button
                       type="button"
-                      onClick={() => { setIsCreatingScenario(false); setEditingScenario(null); }}
-                      className="text-xs text-slate-500 hover:text-slate-900 font-semibold cursor-pointer"
+                      onClick={() => { setEditingScenario(null); setIsCreatingScenario(false); }}
+                      className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer font-bold"
                     >
-                      ← Volver a Escenarios
+                      Cancelar
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre del Escenario:</label>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nombre / Título:</label>
                       <input
                         type="text"
                         value={scLabel}
                         onChange={e => setScLabel(e.target.value)}
                         required
-                        className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-2 bg-white border border-slate-300 rounded-xl text-xs outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Etiqueta / Badge:</label>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Distintivo (Badge):</label>
                       <input
                         type="text"
                         value={scBadge}
                         onChange={e => setScBadge(e.target.value)}
-                        placeholder="Ej. PROPUESTA 2"
-                        className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej. PROPUESTA GREMIAL"
+                        className="w-full p-2 bg-white border border-slate-300 rounded-xl text-xs outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Matriz de Tarifas */}
-                  <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2">
-                    <span className="text-[11px] font-bold uppercase text-slate-600 block">Tarifas por Categoría (Bs / viaje):</span>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500">Adulto:</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0"
-                          value={scAdultFare}
-                          onChange={e => setScAdultFare(Number(e.target.value))}
-                          required
-                          className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500">Adulto Mayor:</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0"
-                          value={scAdultosMayores}
-                          onChange={e => setScAdultosMayores(Number(e.target.value))}
-                          required
-                          className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500">Universitario:</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0"
-                          value={scUniversitarios}
-                          onChange={e => setScUniversitarios(Number(e.target.value))}
-                          required
-                          className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500">Colegial:</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0"
-                          value={scColegiales}
-                          onChange={e => setScColegiales(Number(e.target.value))}
-                          required
-                          className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500">Escolar:</label>
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0"
-                          value={scEscolares}
-                          onChange={e => setScEscolares(Number(e.target.value))}
-                          required
-                          className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase">Tarifa Adulto (Bs):</label>
+                      <input
+                        type="number"
+                        step="0.10"
+                        value={scAdultFare}
+                        onChange={e => setScAdultFare(Number(e.target.value))}
+                        className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase">Adultos Mayores (Bs):</label>
+                      <input
+                        type="number"
+                        step="0.10"
+                        value={scAdultosMayores}
+                        onChange={e => setScAdultosMayores(Number(e.target.value))}
+                        className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase">Universitarios (Bs):</label>
+                      <input
+                        type="number"
+                        step="0.10"
+                        value={scUniversitarios}
+                        onChange={e => setScUniversitarios(Number(e.target.value))}
+                        className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase">Colegiales (Bs):</label>
+                      <input
+                        type="number"
+                        step="0.10"
+                        value={scColegiales}
+                        onChange={e => setScColegiales(Number(e.target.value))}
+                        className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase">Escolares (Bs):</label>
+                      <input
+                        type="number"
+                        step="0.10"
+                        value={scEscolares}
+                        onChange={e => setScEscolares(Number(e.target.value))}
+                        className="w-full p-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                      />
                     </div>
                   </div>
 
-                  {/* Factores de Sensibilidad */}
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Factor Demanda:</label>
-                      <select
-                        value={scDemandFactor}
-                        onChange={e => setScDemandFactor(Number(e.target.value))}
-                        className="w-full p-2.5 bg-white border border-slate-300 rounded-xl"
-                      >
-                        <option value={1.0}>100% (Normal)</option>
-                        <option value={0.9}>90% (Estrés -10%)</option>
-                        <option value={0.85}>85% (Crisis -15%)</option>
-                        <option value={1.1}>110% (Pico +10%)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Factor Diésel:</label>
-                      <select
-                        value={scFuelPriceFactor}
-                        onChange={e => setScFuelPriceFactor(Number(e.target.value))}
-                        className="w-full p-2.5 bg-white border border-slate-300 rounded-xl"
-                      >
-                        <option value={1.0}>100% (Precio Base Bs. 17.95)</option>
-                        <option value={1.15}>115% (+15% Incremento)</option>
-                        <option value={1.25}>125% (+25% Estrés)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
+                  <div className="flex gap-2 justify-end pt-2">
                     <button
                       type="button"
-                      onClick={() => { setIsCreatingScenario(false); setEditingScenario(null); }}
-                      className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl cursor-pointer"
+                      onClick={() => { setEditingScenario(null); setIsCreatingScenario(false); }}
+                      className="px-3 py-1.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                      className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                     >
-                      Guardar y Calibrar Escenario
+                      Guardar Escenario
                     </button>
                   </div>
                 </form>
+              ) : (
+                <div className="space-y-2">
+                  {scenarios.map(sc => (
+                    <div 
+                      key={sc.id} 
+                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${
+                        activeScenarioId === sc.id 
+                          ? 'bg-blue-50/80 border-blue-400 shadow-xs' 
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 text-xs">{sc.label}</h4>
+                          {sc.badge && (
+                            <span className="px-2 py-0.2 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">
+                              {sc.badge}
+                            </span>
+                          )}
+                          {activeScenarioId === sc.id && (
+                            <span className="px-2 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full">
+                              Activo en Simulador
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Tarifa Adulto: <strong className="text-slate-800">Bs. {sc.adultFare.toFixed(2)}</strong> | 
+                          Universitarios: Bs. {sc.socialFares.universitarios.toFixed(2)} | 
+                          Escolares: Bs. {sc.socialFares.escolares.toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {onSelectScenario && (
+                          <button
+                            onClick={() => onSelectScenario(sc.id)}
+                            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              activeScenarioId === sc.id
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {activeScenarioId === sc.id ? 'Seleccionado' : 'Activar'}
+                          </button>
+                        )}
+                        {isSuperAdmin && (
+                          <>
+                            <button
+                              onClick={() => startEditScenario(sc)}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            {sc.isCustom && onDeleteScenario && (
+                              <button
+                                onClick={() => onDeleteScenario(sc.id)}
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                              >
+                                Eliminar
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
 
         </div>
-
       </div>
     </div>
   );

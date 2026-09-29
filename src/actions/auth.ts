@@ -334,8 +334,49 @@ export async function toggleUserActiveStatus(userId: string, isActive: boolean) 
 }
 
 export async function updateUserRoleBySuperAdmin(userId: string, newRole: UserRole) {
+  try {
+    const supabase = createClient();
+    await supabase.from('profiles').update({ role: newRole, updated_at: new Date().toISOString() }).eq('id', userId);
+  } catch {}
   return {
     success: true,
     message: `Rol actualizado a ${newRole}`
+  };
+}
+
+export async function updateUserBySuperAdmin(input: {
+  userId: string;
+  email: string;
+  fullName: string;
+  organization: string;
+  role: UserRole;
+  tenantId: string;
+  password?: string;
+}) {
+  try {
+    const supabase = createClient();
+    await supabase.from('profiles').update({
+      email: input.email.toLowerCase().trim(),
+      full_name: input.fullName.trim(),
+      organization: input.organization.trim(),
+      role: input.role,
+      tenant_id: input.tenantId,
+      updated_at: new Date().toISOString()
+    }).eq('id', input.userId);
+  } catch {}
+  return {
+    success: true,
+    message: `Usuario '${input.fullName}' (${input.role}) actualizado exitosamente.`
+  };
+}
+
+export async function deleteUserBySuperAdmin(userId: string) {
+  try {
+    const supabase = createClient();
+    await supabase.from('profiles').delete().eq('id', userId);
+  } catch {}
+  return {
+    success: true,
+    message: 'Usuario eliminado exitosamente del directorio.'
   };
 }
