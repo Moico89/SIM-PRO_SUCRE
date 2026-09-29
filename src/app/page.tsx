@@ -15,7 +15,7 @@ const defaultParameters: SystemParameters = {
   fuel_price_bs_l: 17.95,
   driver_salary_bs: 3300.0,
   labor_charges_factor: 0.0833333333,
-  maintenance_monthly_bs: 2869.75,
+  maintenance_monthly_bs: 2840.17,
   maintenance_var_share: 0.2513736712,
   maintenance_fixed_share: 0.7486263288,
   other_fixed_monthly_bs: 720.42,
@@ -50,8 +50,8 @@ const defaultLogs: AuditLog[] = [
     entity_name: 'system_parameters',
     field_name: 'maintenance_monthly_bs',
     old_value: { maintenance_monthly_bs: 4266.02 },
-    new_value: { maintenance_monthly_bs: 2869.75 },
-    justification: 'Incorporación de planilla técnica de mantenimiento rebajada oficial v2 (52 ítems Nissan Civilian) acordada con el GAM Sucre.',
+    new_value: { maintenance_monthly_bs: 2840.17 },
+    justification: 'Planilla técnica de mantenimiento 52 ítems Nissan Civilian (Bs. 34.082,00 anual / Bs. 2.840,17 mensual) acordada con el GAM Sucre.',
     created_at: new Date(Date.now() - 3600000 * 2).toISOString()
   },
   {

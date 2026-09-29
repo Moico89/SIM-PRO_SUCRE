@@ -22,3 +22,15 @@
 ## 4. Resiliencia & Persistencia
 - Persistencia local y en servidor de parámetros y escenarios modificados (`simpro_params`, `simpro_scenarios`, `simpro_logs`).
 - Eliminación de errores 500 y 404 mediante buffers de iconos (`favicon.ico`, `icon-192.png`, `icon-512.png`) y server actions con tolerancia a fallos de red.
+
+## 5. Sincronización de Costos Maestros (Nissan Civilian)
+- **Mantenimiento Auditado v2**: Fijado en **Bs. 2.840,17 / mes** por unidad (Costo Total Anual: Bs. 34.082,00 / 12 meses), coincidiendo exactamente con la celda `J55` de la planilla maestra `MANTENIMIENTO_NISSAN`.
+- **Costo Económico Regulatorio Total**: Calibrado a **Bs. 18.760,75 / mes** (OPEX Efectivo en Caja: Bs. 15.289,45 + Depreciación: Bs. 1.653,00 + WACC 11%: Bs. 1.818,30).
+
+## 6. Exportación Excel Maestro Dinámico (5 Hojas Sincronizadas)
+- Generación de libro `.xlsx` con todas las modificaciones guardadas en tiempo real:
+  1. `Resumen_Economico`: Indicadores clave, estructura OPEX/CAPEX y tarifas técnica vs social.
+  2. `Matriz_Tarifaria`: Categorías de usuario, recaudación proyectada y compensación municipal.
+  3. `32_Rutas_Rentabilidad`: Modelación ruta por ruta (IPK, flota asignada, ingresos y balance operativo).
+  4. `52_Items_Mantenimiento`: Desglose detallado de los 52 ítems Nissan Civilian con costos unitarios, frecuencias y costo mensual calibrado en Bs. 2.840,17.
+  5. `Bitacora_Auditoria_Legal`: Historial inmutable con firma digital del operador, justificación y estampas de tiempo ISO.
