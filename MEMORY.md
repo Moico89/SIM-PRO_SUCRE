@@ -9,8 +9,16 @@
   - `Delegado Sindical` & `Observador`: Consulta y simulación en tiempo real (modo lectura/proyección).
 
 ## 2. Inmutabilidad y Auditoría Estricta
-- Cada modificación en `system_parameters` o `fare_categories` genera un registro inmutable en `audit_logs` con `user_email`, `user_role`, `user_organization`, `action`, `old_value`, `new_value`, `justification` y timestamp exacto.
+- Cada modificación en `system_parameters`, `fare_categories` o `scenarios` genera un registro inmutable en `audit_logs` con `user_email`, `user_role`, `user_organization`, `action`, `old_value`, `new_value`, `justification` y timestamp exacto.
+- Soporte para las acciones: `'CAMBIO_PARAMETRO'`, `'CAMBIO_TARIFA'`, `'CREACION_ESCENARIO'`, `'EDICION_ESCENARIO'`, `'BLOQUEO_SESION'`, `'DESBLOQUEO_SESION'`.
 
-## 3. Experiencia de Usuario & Responsive Mobile
-- Modo inicial restringido en `LandingPage`. Ningún usuario accede al simulador sin autenticación previa mediante correo o Google/Gmail.
-- Dossier PDF adaptado para impresión oficial (`@media print`), exportación de `.xlsx` dinámico con SheetJS.
+## 3. Gestor Dinámico de Escenarios
+- Todos los escenarios (oficiales y personalizados) disponen de botones de control directo:
+  - **Activar / Desactivar**: Alterna el escenario activo en la modelación económica.
+  - **Editar**: Modifica tarifas sociales (adulto, adultos mayores, universitarios, etc.) y factores de demanda/combustible.
+  - **Eliminar**: Remueve propuestas descartadas.
+  - **Crear Nuevo**: Añade variantes de concertación.
+
+## 4. Resiliencia & Persistencia
+- Persistencia local y en servidor de parámetros y escenarios modificados (`simpro_params`, `simpro_scenarios`, `simpro_logs`).
+- Eliminación de errores 500 y 404 mediante buffers de iconos (`favicon.ico`, `icon-192.png`, `icon-512.png`) y server actions con tolerancia a fallos de red.
