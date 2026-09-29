@@ -53,7 +53,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
     if (emailClean.includes('sucre.bo') || emailClean.startsWith('admin')) return { role: 'admin_municipal' as UserRole, org: 'GAM Sucre', fullName: 'Administrador GAMS', tenant_id: 'tenant-gams-sucre' };
     if (emailClean.includes('consultor') || emailClean.includes('ecotraffic')) return { role: 'consultor_ecotraffic' as UserRole, org: 'Ecotraffic Consultoría', fullName: 'Consultor Técnico', tenant_id: 'tenant-ecotraffic' };
     if (emailClean.includes('sindicato') || emailClean.includes('chofer')) return { role: 'delegado_sindical' as UserRole, org: 'Sindicato San Cristóbal', fullName: 'Delegado Sindical', tenant_id: 'tenant-sindicato-san-cristobal' };
-    return { role: fallbackRole, org: fallbackOrg, fullName: 'Usuario Tarfy OS', tenant_id: 'tenant-gams-sucre' };
+    return { role: fallbackRole, org: fallbackOrg, fullName: 'Usuario Tarify OS', tenant_id: 'tenant-gams-sucre' };
   };
 
   const handleGoogleLogin = async () => {
@@ -162,12 +162,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-6 relative">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-teal-400 flex items-center justify-center font-black text-lg shadow-md text-white">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center font-black text-lg shadow-md text-white">
               T
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-black tracking-tight">Tarfy OS</h2>
+                <h2 className="text-base font-black tracking-tight">Tarify OS</h2>
                 <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-1.5 py-0.5 rounded font-mono font-bold">
                   SaaS Multi-Tenant
                 </span>

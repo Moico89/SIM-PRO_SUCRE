@@ -40,7 +40,7 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
   let assignedRole: UserRole = 'observador_publico';
   let assignedOrg = 'Sociedad Civil';
   let assignedTenantId = 'tenant-gams-sucre';
-  let fullName = 'Usuario Tarfy OS';
+  let fullName = 'Usuario Tarify OS';
 
   if (emailLower === 'ecotraffic.bo@gmail.com' || emailLower.includes('ecotraffic')) {
     assignedRole = 'superadmin';

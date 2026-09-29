@@ -3,13 +3,13 @@ import './globals.css';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
-  title: 'Tarfy OS — Plataforma de Gobernanza & Regulación Tarifaria SaaS (GAMS & Ecotraffic)',
+  title: 'Tarify OS — Plataforma de Gobernanza & Regulación Tarifaria SaaS (GAMS & Ecotraffic)',
   description: 'Sistema Operativo de Gobernanza Tarifaria, Modelación del Costo de Operación Vehicular (COV) y Auditoría Inmutable para Gobiernos Municipales.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Tarfy OS',
+    title: 'Tarify OS',
   },
 };
 

@@ -716,7 +716,7 @@ export default function DashboardView({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm tracking-tight text-white">
-                    Tarfy OS
+                    Tarify OS
                   </span>
                   <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.5 rounded font-mono font-bold">
                     SaaS v3.3
