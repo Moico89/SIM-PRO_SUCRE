@@ -776,20 +776,48 @@ export default function DashboardView({
               {isSuperAdmin && (
                 <button
                   onClick={() => setIsAdminPanelOpen(true)}
-                  className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95"
+                  className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
                 >
-                  <span>👑 Panel Admin</span>
+                  <svg className="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                  </svg>
+                  <span>Panel SuperAdmin</span>
                 </button>
               )}
 
               {/* Badge de Identidad Autenticada Institucional (Acceso Controlado) */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-slate-900/90 border-slate-700 text-xs shadow-xs">
                 <span className="font-bold flex items-center gap-1.5 text-slate-200">
-                  {activeRole === 'superadmin' && '👑 SuperAdmin'}
-                  {activeRole === 'admin_municipal' && '🏛️ Admin Municipal'}
-                  {activeRole === 'consultor_ecotraffic' && '🔬 Consultor Técnico'}
-                  {activeRole === 'delegado_sindical' && '🚌 Delegado Sindical'}
-                  {activeRole === 'observador_publico' && '👁️ Observador'}
+                  {activeRole === 'superadmin' && (
+                    <span className="text-amber-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                      SuperAdmin
+                    </span>
+                  )}
+                  {activeRole === 'admin_municipal' && (
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                      Admin GAMS
+                    </span>
+                  )}
+                  {activeRole === 'consultor_ecotraffic' && (
+                    <span className="text-cyan-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                      Consultor Técnico
+                    </span>
+                  )}
+                  {activeRole === 'delegado_sindical' && (
+                    <span className="text-indigo-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h8m-8 4h8m-8 4h4m-7 5h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                      Delegado Sindical
+                    </span>
+                  )}
+                  {activeRole === 'observador_publico' && (
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                      Observador Público
+                    </span>
+                  )}
                 </span>
                 <span className="text-slate-600">|</span>
                 <span className="text-blue-300 font-mono text-[11px] max-w-[170px] truncate" title={userEmail}>
@@ -800,7 +828,7 @@ export default function DashboardView({
               {/* Botón Cerrar Sesión */}
               <button
                 onClick={handleLogout}
-                className="bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold px-3 py-1.5 rounded-xl transition-all active:scale-95"
+                className="bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold px-3 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer"
                 title="Cerrar sesión y volver a la portada"
               >
                 Cerrar Sesión
@@ -811,7 +839,7 @@ export default function DashboardView({
             <div className="flex lg:hidden items-center gap-2">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none"
+                className="p-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}/>
@@ -827,11 +855,7 @@ export default function DashboardView({
               <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
                 <span className="text-slate-400">Rol Autenticado:</span>
                 <span className="font-bold text-amber-300">
-                  {activeRole === 'superadmin' && '👑 SuperAdmin'}
-                  {activeRole === 'admin_municipal' && '🏛️ Admin Municipal'}
-                  {activeRole === 'consultor_ecotraffic' && '🔬 Consultor Técnico'}
-                  {activeRole === 'delegado_sindical' && '🚌 Delegado Sindical'}
-                  {activeRole === 'observador_publico' && '👁️ Observador'}
+                  {activeRole.toUpperCase()}
                 </span>
               </div>
               <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">

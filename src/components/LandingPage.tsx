@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { OFFICIAL_TENANTS } from '@/lib/tenants';
 
 interface LandingPageProps {
@@ -11,6 +11,15 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
   const [activeTabFeature, setActiveTabFeature] = useState<'distribucion' | 'demanda' | 'comparativa'>('distribucion');
   const [emailNewsletter, setEmailNewsletter] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto-carousel para casos de éxito
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % OFFICIAL_TENANTS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleNewsletter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,12 +92,21 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
       </header>
 
       {/* ========================================================================= */}
-      {/* 🚀 2. HERO SECTION CON GRÁFICOS ISOMÉTRICOS & MODELACIÓN                  */}
+      {/* 🚀 2. HERO SECTION CON PORTADA ANIMADA & MODELACIÓN ECONOMÉTRICA          */}
       {/* ========================================================================= */}
       <section id="inicio" className="relative pt-12 pb-24 overflow-hidden border-b border-slate-800/80 bg-gradient-to-b from-slate-950 via-[#070e1c] to-[#0a162b]">
         
-        {/* Glow Effects de fondo */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-gradient-to-r from-cyan-600/20 to-blue-600/20 blur-[130px] pointer-events-none rounded-full" />
+        {/* Fondo Animado con Gráfica Geométrica & Partículas */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-r from-cyan-600/20 via-blue-600/20 to-indigo-600/15 blur-[140px] rounded-full animate-pulse" />
+          
+          {/* Grid tecnológico en perspectiva */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_40%,#000_70%,transparent_100%)] opacity-70" />
+          
+          {/* Nodos de red animados */}
+          <div className="absolute top-1/3 left-10 w-72 h-72 bg-cyan-500/5 rounded-full filter blur-3xl animate-ping" style={{ animationDuration: '8s' }} />
+          <div className="absolute top-1/2 right-10 w-80 h-80 bg-blue-500/5 rounded-full filter blur-3xl animate-ping" style={{ animationDuration: '10s' }} />
+        </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-12">
           
@@ -132,15 +150,17 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
           </div>
 
           {/* ===================================================================== */}
-          {/* 💎 4 CARDS FLOTANTES SUPERIORES (DISEÑO IDÉNTICO AL MOCKUP)          */}
+          {/* 💎 4 CARDS FLOTANTES SUPERIORES (VECTORES PROFESIONALES)             */}
           {/* ===================================================================== */}
           <div id="caracteristicas" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pt-8">
             
             {/* Card 1: Modelación del COV */}
             <div className="bg-white text-slate-900 p-6 rounded-3xl shadow-xl hover:shadow-2xl border border-slate-200 hover:border-cyan-400 transition-all duration-300 flex flex-col justify-between group">
               <div className="space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500/15 to-blue-500/15 text-cyan-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                  📈
+                <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-200/80 text-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
                 </div>
                 <h3 className="font-extrabold text-base text-slate-900 tracking-tight">
                   Modelación del COV con precisión
@@ -158,8 +178,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {/* Card 2: Simulación de Escenarios */}
             <div className="bg-white text-slate-900 p-6 rounded-3xl shadow-xl hover:shadow-2xl border border-slate-200 hover:border-cyan-400 transition-all duration-300 flex flex-col justify-between group">
               <div className="space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-500/15 to-indigo-500/15 text-blue-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                  ⚡
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200/80 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
                 </div>
                 <h3 className="font-extrabold text-base text-slate-900 tracking-tight">
                   Simulación de Escenarios en tiempo real
@@ -177,8 +199,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {/* Card 3: Concertación Tarifaria */}
             <div className="bg-white text-slate-900 p-6 rounded-3xl shadow-xl hover:shadow-2xl border border-slate-200 hover:border-cyan-400 transition-all duration-300 flex flex-col justify-between group">
               <div className="space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500/15 to-teal-500/15 text-emerald-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                  🤝
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                  </svg>
                 </div>
                 <h3 className="font-extrabold text-base text-slate-900 tracking-tight">
                   Concertación Tarifaria Transparente
@@ -196,8 +220,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {/* Card 4: Determinación Tarifa Técnica */}
             <div className="bg-white text-slate-900 p-6 rounded-3xl shadow-xl hover:shadow-2xl border border-slate-200 hover:border-cyan-400 transition-all duration-300 flex flex-col justify-between group">
               <div className="space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500/15 to-orange-500/15 text-amber-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                  ⚖️
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+                  </svg>
                 </div>
                 <h3 className="font-extrabold text-base text-slate-900 tracking-tight">
                   Determinación de Tarifa Técnica y Social
@@ -275,7 +301,7 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
                 </div>
               </div>
 
-              {/* Gráfico Simulado & Tabs */}
+              {/* Gráfico Simulado & Barras */}
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-300">Desglose Operativo y Equilibrio Financiero</span>
@@ -341,8 +367,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center font-bold text-lg">
-                    ⛽
+                  <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center font-bold">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-slate-900">Distribución de Costos por KM</h3>
@@ -362,8 +390,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg">
-                    👥
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-slate-900">Simulación de Demanda & IPK</h3>
@@ -383,8 +413,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-lg">
-                    📊
+                  <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-slate-900">Comparativa de Tarifas & Rentabilidad</h3>
@@ -430,8 +462,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-3 hover:border-cyan-500 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-700 flex items-center justify-center text-2xl font-black">
-                🔍
+              <div className="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-700 flex items-center justify-center font-bold">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
               </div>
               <h3 className="font-extrabold text-base text-slate-900">Transparencia Total</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
@@ -440,8 +474,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             </div>
 
             <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-3 hover:border-emerald-500 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl font-black">
-                💰
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
               </div>
               <h3 className="font-extrabold text-base text-slate-900">Sostenibilidad Financiera</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
@@ -450,8 +486,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             </div>
 
             <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-3 hover:border-indigo-500 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-2xl font-black">
-                🛡️
+              <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
               </div>
               <h3 className="font-extrabold text-base text-slate-900">Equidad Social</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
@@ -460,8 +498,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             </div>
 
             <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 space-y-3 hover:border-amber-500 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl font-black">
-                ⚡
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
               </div>
               <h3 className="font-extrabold text-base text-slate-900">Empoderamiento Técnico</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
@@ -493,7 +533,9 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {OFFICIAL_TENANTS.map(t => (
               <div key={t.id} className="px-5 py-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs flex items-center gap-3 hover:border-cyan-400 hover:shadow-md transition-all">
                 <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold text-sm">
-                  🏛️
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                  </svg>
                 </div>
                 <div>
                   <div className="font-extrabold text-xs text-slate-900">{t.name}</div>
@@ -631,8 +673,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {/* Artículo 1 */}
             <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 hover:border-cyan-500/60 transition-all space-y-4 p-5 flex flex-col justify-between">
               <div className="space-y-3">
-                <div className="h-36 rounded-2xl bg-gradient-to-tr from-cyan-900/60 to-blue-900/40 flex items-center justify-center text-4xl border border-slate-800">
-                  🚌
+                <div className="h-36 rounded-2xl bg-gradient-to-tr from-cyan-950 to-blue-950 flex items-center justify-center border border-slate-800 text-cyan-400">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
+                  </svg>
                 </div>
                 <span className="text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded-full font-mono">
                   MANTENIMIENTO
@@ -652,8 +696,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {/* Artículo 2 */}
             <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 hover:border-cyan-500/60 transition-all space-y-4 p-5 flex flex-col justify-between">
               <div className="space-y-3">
-                <div className="h-36 rounded-2xl bg-gradient-to-tr from-blue-900/60 to-indigo-900/40 flex items-center justify-center text-4xl border border-slate-800">
-                  ⛽
+                <div className="h-36 rounded-2xl bg-gradient-to-tr from-blue-950 to-indigo-950 flex items-center justify-center border border-slate-800 text-blue-400">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
                 </div>
                 <span className="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded-full font-mono">
                   COMBUSTIBLE
@@ -673,8 +719,10 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             {/* Artículo 3 */}
             <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 hover:border-cyan-500/60 transition-all space-y-4 p-5 flex flex-col justify-between">
               <div className="space-y-3">
-                <div className="h-36 rounded-2xl bg-gradient-to-tr from-teal-900/60 to-emerald-900/40 flex items-center justify-center text-4xl border border-slate-800">
-                  ⚖️
+                <div className="h-36 rounded-2xl bg-gradient-to-tr from-teal-950 to-emerald-950 flex items-center justify-center border border-slate-800 text-emerald-400">
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+                  </svg>
                 </div>
                 <span className="text-[10px] bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2 py-0.5 rounded-full font-mono">
                   EQUIDAD SOCIAL
@@ -708,7 +756,11 @@ export default function LandingPage({ onOpenLogin }: LandingPageProps) {
             <div className="md:col-span-4 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-lg">
-                  T
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 3v18h18" />
+                    <path d="M18 9l-5 5-4-4-3 3" />
+                    <circle cx="18" cy="9" r="2" fill="currentColor" />
+                  </svg>
                 </div>
                 <span className="text-xl font-black text-white">Tarify OS</span>
               </div>

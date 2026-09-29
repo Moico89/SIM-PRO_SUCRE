@@ -1,7 +1,7 @@
-# MEMORY: Arquitectura & Decisiones de Gobernanza SIM-PRO
+# MEMORY: Arquitectura & Decisiones de Gobernanza SIM-PRO / Tarify OS
 
 ## 1. Módulo de Autenticación & Control de Acceso (RBAC)
-- **Eliminación del Selector de Roles**: Queda terminantemente prohibido el cambio de rol manual o no autenticado en la interfaz. El rol se hereda estrictamente del perfil (`Profile`) verificado en Supabase Auth / Google OAuth.
+- **Eliminación del Selector de Roles**: Queda terminantemente prohibido el cambio de rol manual o no autenticado en la interfaz. El rol se hereda estrictamente del perfil (`Profile`) verificado en Supabase Auth / Google OAuth o directorio de credenciales autorizadas.
 - **Jerarquía de Cuentas**:
   - `SuperAdmin` (`ecotraffic.bo@gmail.com`): Creación de administradores Nivel 1, asignación de roles, auditoría de accesos.
   - `Admin Municipal` (`admin.transporte@sucre.bo` / `@sucre.bo`): Ajuste de escenarios y parámetros oficiales con justificación legal obligatoria ($\ge 10$ caracteres).
@@ -35,13 +35,18 @@
   4. `52_Items_Mantenimiento`: Desglose detallado de los 52 ítems Nissan Civilian con costos unitarios, frecuencias y costo mensual calibrado en Bs. 2.840,17.
   5. `Bitacora_Auditoria_Legal`: Historial inmutable con firma digital del operador, justificación y estampas de tiempo ISO.
 
-## 7. Tarfy OS: Arquitectura SaaS Multi-Tenant & Motor de Autenticación
+## 7. Tarify OS: Arquitectura SaaS Multi-Tenant & Motor de Autenticación Pro
 - **Catálogo de Tenants**:
   - `tenant-gams-sucre`: Gobierno Autónomo Municipal de Sucre (Tenant #1 Oficial).
   - `tenant-ecotraffic`: Ecotraffic Consultoría Regulatoria & Movilidad.
   - `tenant-sindicato-san-cristobal`: Sindicato de Choferes San Cristóbal.
   - `tenant-sindicato-sucre`: Sindicato de Micros y Colectivos Sucre.
-- **Motor de Autenticación & Creación de Usuarios**:
-  - SuperAdmin (`ecotraffic.bo@gmail.com`) crea y autoriza usuarios Administradores Nivel 1 asignándolos a cualquier Tenant/Organización.
-  - Persistencia de sesión bidireccional (`tarfy_session`, `simpro_custom_credentials`, `simpro_directory_users`) con restauración automática al recargar o navegar entre Landing Page y Simulador.
-  - Soporte unificado para Google OAuth y credenciales institucionales seguras.
+- **Motor de Autenticación Zero-Trust & Creación de Usuarios**:
+  - SuperAdmin exclusivo para `ecotraffic.bo@gmail.com` con validación estricta de contraseña (`Sucre2026*` o credencial registrada).
+  - Cualquier usuario público o correo no registrado que inicie sesión obtiene estrictamente el rol `observador_publico` (Solo Lectura, sin permisos de edición ni panel SuperAdmin).
+  - Administradores Nivel 1 (`admin_municipal`, `consultor_ecotraffic`, etc.) deben ser creados y autorizados explícitamente desde el Panel de Gestión por el SuperAdmin.
+  - Persistencia de sesión bidireccional (`tarfy_session`, `simpro_custom_credentials`, `simpro_directory_users`) con auditoría de cada inicio de sesión.
+
+## 8. Estándar de Diseño Visual & UI/UX Corporativo
+- **Cero Emojis en Producción**: Toda la interfaz (Landing Page, Modales, Dashboard, Alertas, Badges y Tablas) utiliza exclusivamente vectores SVG profesionales y paletas cromáticas sobrias (Slate, Cyan, Emerald, Rose, Amber).
+- **Hero & Portada Animada**: Grid en perspectiva 3D, generador de partículas flotantes, nodos de interconexión viva y micro-animaciones interactivas.
