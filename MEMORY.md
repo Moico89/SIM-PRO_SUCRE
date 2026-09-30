@@ -96,4 +96,16 @@
 4. **Respaldo & Sincronización Cloud**:
    - Verificar integridad de las tablas `negotiation_scenarios` y `audit_logs` en Supabase previo a la reunión plenaria de concertación.
 
+## 16. Corrección de Legibilidad y Refinamiento de la Portada (Hero & Tarjetas)
+- **Causa Raíz Diagnosticada**: La clase `.hero-glow` en [globals.css](file:///c:/Files%20ECOTRAFFIC%20A8/SIM-PRO_TARIFA/src/app/globals.css) utilizaba la propiedad abreviada `background: radial-gradient(...)`, la cual reseteaba el `background-color` a transparente, exponiendo el fondo claro `bg-slate-50` del body y tornando invisibles los textos blancos (`text-white`) y celestes del Hero en el despliegue web.
+- **Solución Técnica Implementada**:
+  - Corrección de `.hero-glow` a `background-image: radial-gradient(...)` para no sobreescribir el color de fondo.
+  - Asignación explícita e inmutable de `style={{ backgroundColor: '#070f26' }}` en la sección Hero de [LandingPage.tsx](file:///c:/Files%20ECOTRAFFIC%20A8/SIM-PRO_TARIFA/src/components/LandingPage.tsx#L119) para blindar el fondo corporativo profundo.
+  - Incorporación de iluminación ambiental dual con halos desenfocados cian (`w-[600px] bg-cyan-500/15`) y azul profundo.
+  - Tipografía H1 con contraste superior (`text-white font-extrabold`) y gradiente de alta definición sobre `"Tiempo Real"`. Párrafo descriptivo elevado a `text-slate-200 font-normal` (cumplimiento WCAG AAA).
+  - Botón CTA principal modernizado a gradiente cian/cielo de alta conversión (`bg-gradient-to-r from-cyan-400 to-sky-400 text-[#070f26]`) y botón de sala de concertación en cristal oscuro pulido.
+  - Tarjetas flotantes enriquecidas con tipografía `text-sm text-slate-600` de alta legibilidad, títulos interactivos con hover y bordes de alta definición.
+  - Header alineado cromáticamente con gradientes Tarify OS.
+
+
 

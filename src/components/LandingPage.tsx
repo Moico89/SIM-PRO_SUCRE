@@ -98,13 +98,13 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
           <div className="flex items-center gap-3">
             <button
               onClick={onOpenLogin}
-              className="text-sm font-semibold text-slate-700 hover:text-cyan-600 px-4 py-2 rounded-lg border border-slate-200 hover:border-slate-300 transition-all cursor-pointer"
+              className="text-sm font-semibold text-slate-700 hover:text-cyan-700 px-4 py-2 rounded-lg border border-slate-300 hover:border-cyan-400 hover:bg-cyan-50/40 transition-all cursor-pointer"
             >
               Iniciar Sesión
             </button>
             <button
               onClick={handleDemoClick}
-              className="text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 px-5 py-2.5 rounded-lg shadow-sm shadow-blue-900/10 hover:shadow-md transition-all cursor-pointer"
+              className="text-sm font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 px-5 py-2.5 rounded-lg shadow-sm shadow-cyan-900/20 hover:shadow-md transition-all cursor-pointer"
             >
               Solicitar Demo
             </button>
@@ -116,7 +116,15 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       {/* ========================================================================= */}
       {/* 🚀 2. HERO SECTION CON PORTADA ANIMADA & CONSOLA EN VIVO                  */}
       {/* ========================================================================= */}
-      <section className="relative bg-[#0b1329] hero-glow text-white pt-16 pb-28 lg:pb-36 overflow-hidden" id="inicio">
+      <section 
+        className="relative bg-[#070f26] hero-glow text-white pt-16 pb-28 lg:pb-36 overflow-hidden" 
+        style={{ backgroundColor: '#070f26' }}
+        id="inicio"
+      >
+        {/* Ambient illumination glows */}
+        <div className="absolute top-1/4 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-cyan-500/15 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-10 right-1/4 w-[500px] h-[300px] bg-blue-600/10 blur-[130px] rounded-full pointer-events-none" />
+
         {/* Isometric Grid Background Overlay */}
         <div className="absolute inset-0 isometric-grid opacity-30 pointer-events-none" />
 
@@ -125,26 +133,26 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
             
             {/* Left Content Column */}
             <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-semibold uppercase tracking-wider">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0d1f3d] border border-cyan-400/30 text-cyan-300 text-xs font-semibold uppercase tracking-wider shadow-sm shadow-cyan-950/60 backdrop-blur-md">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-sm shadow-cyan-400" />
                 Plataforma SaaS Institucional v3.4
               </div>
 
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight tracking-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-[1.18] tracking-tight">
                 Modelación Econométrica de Tarifas de Transporte en{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-400">
                   Tiempo Real
                 </span>
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-300 font-normal leading-relaxed max-w-xl">
-                <strong className="text-cyan-300 font-medium">Tarify OS:</strong> La plataforma SaaS institucional para modelar con precisión el Costo de Operación Vehicular (COV), balancear el equilibrio financiero del operador y determinar tarifas técnicas y sociales equitativas.
+              <p className="text-base sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl">
+                <strong className="text-cyan-300 font-semibold">Tarify OS:</strong> La plataforma SaaS institucional para modelar con precisión el Costo de Operación Vehicular (COV), balancear el equilibrio financiero del operador y determinar tarifas técnicas y sociales equitativas.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
                 <button
                   onClick={handleDemoClick}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#0b1329] font-bold text-base shadow-lg shadow-cyan-500/30 hover:shadow-cyan-400/50 hover:scale-[1.02] transition-all cursor-pointer"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-[#070f26] font-bold text-base shadow-lg shadow-cyan-500/25 hover:shadow-cyan-400/40 hover:scale-[1.02] transition-all cursor-pointer"
                 >
                   Solicitar una Demo Personalizada
                   <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,7 +161,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
                 </button>
                 <button
                   onClick={onOpenLogin}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/40 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3.5 rounded-xl bg-[#0d1833]/90 hover:bg-[#122044] border border-slate-700/80 hover:border-cyan-500/40 text-slate-100 text-sm font-semibold transition-all cursor-pointer backdrop-blur-sm shadow-md"
                 >
                   <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -297,61 +305,69 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           
           {/* Card 1 */}
-          <div className="bg-white rounded-2xl p-6 shadow-xl shadow-slate-200/80 border border-slate-100 flex flex-col justify-between hover:-translate-y-1 hover:shadow-2xl transition-all duration-300">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 shadow-xl shadow-slate-200/90 border border-slate-200/90 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-2xl hover:border-cyan-400/50 transition-all duration-300 group">
             <div>
-              <div className="w-12 h-12 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-600 flex items-center justify-center mb-5 group-hover:bg-cyan-600 group-hover:text-white transition-all shadow-xs">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-slate-900 leading-snug mb-2">Modelación del COV con precisión</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Tarify OS: La plataforma SaaS con formulación paramétrica para modelar el Costo de Operación Vehicular con rigor econométrico.
+              <h3 className="text-lg font-bold text-slate-900 group-hover:text-cyan-700 transition-colors leading-snug mb-2.5">
+                Modelación del COV con precisión
+              </h3>
+              <p className="text-sm text-slate-600 font-normal leading-relaxed">
+                <strong className="text-slate-800 font-medium">Tarify OS:</strong> Formulación paramétrica y econométrica para estructurar el Costo de Operación Vehicular con rigor técnico auditable.
               </p>
             </div>
           </div>
 
           {/* Card 2 */}
-          <div className="bg-white rounded-2xl p-6 shadow-xl shadow-slate-200/80 border border-slate-100 flex flex-col justify-between hover:-translate-y-1 hover:shadow-2xl transition-all duration-300">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 shadow-xl shadow-slate-200/90 border border-slate-200/90 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-2xl hover:border-sky-400/50 transition-all duration-300 group">
             <div>
-              <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center mb-5 group-hover:bg-sky-600 group-hover:text-white transition-all shadow-xs">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-slate-900 leading-snug mb-2">Simulación de Escenarios en tiempo real</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Tarify OS: Análisis dinámico de sensibilidad ante variación en precios de combustible, subsidios fiscales y tipos de cambio.
+              <h3 className="text-lg font-bold text-slate-900 group-hover:text-sky-700 transition-colors leading-snug mb-2.5">
+                Simulación de Escenarios en tiempo real
+              </h3>
+              <p className="text-sm text-slate-600 font-normal leading-relaxed">
+                <strong className="text-slate-800 font-medium">Tarify OS:</strong> Análisis dinámico de sensibilidad ante variación en precios de combustible, subsidios fiscales y tipos de cambio.
               </p>
             </div>
           </div>
 
           {/* Card 3 */}
-          <div className="bg-white rounded-2xl p-6 shadow-xl shadow-slate-200/80 border border-slate-100 flex flex-col justify-between hover:-translate-y-1 hover:shadow-2xl transition-all duration-300">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 shadow-xl shadow-slate-200/90 border border-slate-200/90 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-2xl hover:border-blue-400/50 transition-all duration-300 group">
             <div>
-              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-5 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-slate-900 leading-snug mb-2">Concertación Tarifaria Transparente</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Tarify OS: Datos auditables y tableros compartidos para mesas técnicas tripartitas entre municipios, gremios y sociedad civil.
+              <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors leading-snug mb-2.5">
+                Concertación Tarifaria Transparente
+              </h3>
+              <p className="text-sm text-slate-600 font-normal leading-relaxed">
+                <strong className="text-slate-800 font-medium">Tarify OS:</strong> Datos auditables y tableros compartidos para mesas técnicas tripartitas entre municipios, gremios y sociedad civil.
               </p>
             </div>
           </div>
 
           {/* Card 4 */}
-          <div className="bg-white rounded-2xl p-6 shadow-xl shadow-slate-200/80 border border-slate-100 flex flex-col justify-between hover:-translate-y-1 hover:shadow-2xl transition-all duration-300">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 shadow-xl shadow-slate-200/90 border border-slate-200/90 flex flex-col justify-between hover:-translate-y-1.5 hover:shadow-2xl hover:border-teal-400/50 transition-all duration-300 group">
             <div>
-              <div className="w-12 h-12 rounded-xl bg-teal-50 border border-teal-100 text-teal-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-xl bg-teal-50 border border-teal-100 text-teal-600 flex items-center justify-center mb-5 group-hover:bg-teal-600 group-hover:text-white transition-all shadow-xs">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-slate-900 leading-snug mb-2">Determinación de Tarifa Técnica y Social</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Tarify OS: Fórmulas transparentes que concilian la rentabilidad justa del operador y la asequibilidad del usuario final.
+              <h3 className="text-lg font-bold text-slate-900 group-hover:text-teal-700 transition-colors leading-snug mb-2.5">
+                Determinación de Tarifa Técnica y Social
+              </h3>
+              <p className="text-sm text-slate-600 font-normal leading-relaxed">
+                <strong className="text-slate-800 font-medium">Tarify OS:</strong> Fórmulas transparentes que concilian la rentabilidad justa del operador y la asequibilidad del usuario final.
               </p>
             </div>
           </div>
