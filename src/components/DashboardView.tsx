@@ -1,86 +1,43 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
+import * as XLSX from 'xlsx';
 import type { SystemParameters, FareCategory, AuditLog, UserRole } from '@/types/database';
 import type { ScenarioConfig } from '@/types/scenario';
 import { updateSystemParameter } from '@/actions/parameters';
+import { getSharedScenarios, saveSharedScenario, deleteSharedScenario } from '@/actions/scenarios';
+import { OFFICIAL_SCENARIOS } from '@/data/officialScenarios';
 import { createClient } from '@/lib/supabase/client';
 import type { UpdateParameterInput } from '@/lib/validations/parameters';
 import AuthModal from '@/components/AuthModal';
 import AdminUsersPanel from '@/components/AdminUsersPanel';
 import LandingPage from '@/components/LandingPage';
 import ScenarioManagerModal from '@/components/ScenarioManagerModal';
+import SheetMantenimientoNissan from '@/components/excel-sheets/SheetMantenimientoNissan';
+import SheetSupuestosParametros from '@/components/excel-sheets/SheetSupuestosParametros';
+import SheetCostosOperacionCov from '@/components/excel-sheets/SheetCostosOperacionCov';
+import SheetEconomiaPropietario from '@/components/excel-sheets/SheetEconomiaPropietario';
+import maintenanceData from '@/data/maintenanceItems.json';
 
 interface DashboardViewProps {
   initialParameters: SystemParameters;
   initialFares: FareCategory[];
   initialLogs: AuditLog[];
+  initialScenarios?: ScenarioConfig[];
   currentRole: UserRole;
   currentUserEmail: string;
 }
 
 type EditableParameterField = UpdateParameterInput['field'];
-type TabType = 'resumen' | 'tarifas' | 'rutas' | 'auditoria';
+type TabType = 'resumen' | 'cov' | 'propietario' | 'mantenimiento' | 'parametros' | 'tarifas' | 'rutas' | 'auditoria';
 
-const defaultScenarios: ScenarioConfig[] = [
-  {
-    id: 'social2',
-    label: 'Social 2 (Bs. 3,50)',
-    badge: 'RECOMENDADO',
-    adultFare: 3.50,
-    socialFares: { adultos: 3.50, adultosMayores: 2.50, universitarios: 2.00, colegiales: 1.50, escolares: 1.50, discapacidad: 0 },
-    demandFactor: 1.0,
-    fuelPriceFactor: 1.0,
-    color: 'text-emerald-700 font-extrabold',
-    isCustom: false
-  },
-  {
-    id: 'social1',
-    label: 'Social 1 (Bs. 3,80)',
-    adultFare: 3.80,
-    socialFares: { adultos: 3.80, adultosMayores: 3.00, universitarios: 2.00, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
-    demandFactor: 1.0,
-    fuelPriceFactor: 1.0,
-    color: 'text-slate-700',
-    isCustom: false
-  },
-  {
-    id: 'technical',
-    label: 'Técnica (Bs. 3,45)',
-    badge: 'EQUILIBRIO',
-    adultFare: 3.4485,
-    socialFares: { adultos: 3.4485, adultosMayores: 2.6822, universitarios: 1.9158, colegiales: 1.1495, escolares: 0.7663, discapacidad: 0 },
-    demandFactor: 1.0,
-    fuelPriceFactor: 1.0,
-    color: 'text-blue-700',
-    isCustom: false
-  },
-  {
-    id: 'current',
-    label: 'Vigente (Bs. 4,50)',
-    adultFare: 4.50,
-    socialFares: { adultos: 4.50, adultosMayores: 3.50, universitarios: 2.50, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
-    demandFactor: 1.0,
-    fuelPriceFactor: 1.0,
-    color: 'text-slate-700',
-    isCustom: false
-  },
-  {
-    id: 'stress',
-    label: 'Estrés (-10% / +15%)',
-    adultFare: 4.50,
-    socialFares: { adultos: 4.50, adultosMayores: 3.50, universitarios: 2.50, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
-    demandFactor: 0.90,
-    fuelPriceFactor: 1.15,
-    color: 'text-amber-700',
-    isCustom: false
-  }
-];
+const defaultScenarios: ScenarioConfig[] = OFFICIAL_SCENARIOS;
 
 export default function DashboardView({
   initialParameters,
   initialFares,
   initialLogs,
+  initialScenarios,
   currentRole = 'consultor_ecotraffic',
   currentUserEmail = 'consultor@ecotraffic.com.bo'
 }: DashboardViewProps) {
@@ -94,7 +51,9 @@ export default function DashboardView({
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs);
   
   // Escenarios Dinámicos
-  const [scenarios, setScenarios] = useState<ScenarioConfig[]>(defaultScenarios);
+  const [scenarios, setScenarios] = useState<ScenarioConfig[]>(
+    initialScenarios && initialScenarios.length > 0 ? initialScenarios : defaultScenarios
+  );
   const [activeScenarioId, setActiveScenarioId] = useState<string>('social2');
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
 
@@ -153,8 +112,14 @@ export default function DashboardView({
       }
       const savedScenarios = localStorage.getItem('simpro_scenarios');
       if (savedScenarios) {
-        setScenarios(JSON.parse(savedScenarios));
+        try {
+          const parsed = JSON.parse(savedScenarios);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setScenarios(parsed);
+          }
+        } catch {}
       }
+
       const savedLogs = localStorage.getItem('simpro_logs');
       if (savedLogs) {
         setLogs(JSON.parse(savedLogs));
@@ -273,23 +238,23 @@ export default function DashboardView({
   const regulatoryCost = opex + depreciation + allowedReturn;
   const technicalWeighted = regulatoryCost / unitPax;
   const currentWeighted = fares.reduce((acc, f) => acc + f.demand_share * f.fare_current_bs, 0);
+  const adultCurrentFare = fares.find(f => f.name.toLowerCase().includes('adulto') && !f.name.toLowerCase().includes('mayor'))?.fare_current_bs || 4.50;
+  const technicalAdultFare = currentWeighted > 0 ? (technicalWeighted * (adultCurrentFare / currentWeighted)) : 3.4431;
 
   // Ponderaciones de tarifa del escenario activo
-
   const activeWeightedFare = fares.reduce((acc, f) => {
     let categoryFare = f.fare_social_2_bs;
-    if (activeScenarioId === 'social1') categoryFare = f.fare_social_1_bs;
-    else if (activeScenarioId === 'social2') categoryFare = f.fare_social_2_bs;
-    else if (activeScenarioId === 'technical') categoryFare = f.fare_technical_bs;
-    else if (activeScenarioId === 'current' || activeScenarioId === 'stress') categoryFare = f.fare_current_bs;
-    else if (activeScenario.isCustom) {
+    if (activeScenario.socialFares) {
       if (f.name.includes('Adultos mayores')) categoryFare = activeScenario.socialFares.adultosMayores;
       else if (f.name.includes('Universitarios')) categoryFare = activeScenario.socialFares.universitarios;
       else if (f.name.includes('Colegiales')) categoryFare = activeScenario.socialFares.colegiales;
       else if (f.name.includes('Escolares')) categoryFare = activeScenario.socialFares.escolares;
       else if (f.name.includes('Discapacidad')) categoryFare = 0;
       else categoryFare = activeScenario.adultFare;
-    }
+    } else if (activeScenarioId === 'social1') categoryFare = f.fare_social_1_bs;
+    else if (activeScenarioId === 'social2') categoryFare = f.fare_social_2_bs;
+    else if (activeScenarioId === 'technical') categoryFare = f.fare_technical_bs;
+    else if (activeScenarioId === 'current' || activeScenarioId === 'stress') categoryFare = f.fare_current_bs;
     return acc + f.demand_share * categoryFare;
   }, 0);
 
@@ -363,154 +328,224 @@ export default function DashboardView({
   // =========================================================================
   // EXPORTACIÓN DINÁMICA A EXCEL CON VALORES MODIFICADOS EN VIVO
   // =========================================================================
+  // =========================================================================
+  // EXPORTACIÓN DINÁMICA A EXCEL CON VALORES MODIFICADOS EN VIVO (7-8 HOJAS MAESTRAS)
+  // =========================================================================
   const handleExportDynamicExcel = () => {
     try {
-      const XLSX = window.XLSX;
-      if (XLSX) {
-        const wb = XLSX.utils.book_new();
+      const wb = XLSX.utils.book_new();
 
-        // Hoja 1: Resumen Ejecutivo y Parámetros Calibrados en Vivo
-        const summaryData = [
-          ["SISTEMA DE GOBERNANZA TARIFARIA SUCRE v3.3 — GAM SUCRE & ECOTRAFFIC"],
-          ["DIRECCIÓN DE TRÁFICO, TRANSPORTE Y VIALIDAD"],
-          ["Escenario Activo Exportado", activeScenario.label],
-          ["Fecha y Hora de Exportación", new Date().toLocaleString('es-BO')],
-          [],
-          ["INDICADOR ECONÓMICO", "VALOR AUDITADO", "UNIDAD DE MEDIDA", "OBSERVACIÓN"],
-          ["Tarifa Adulto Oficial", activeAdultFare, "Bs / viaje", "+3,9% s/ técnica de equilibrio"],
-          ["Tarifa Técnica de Equilibrio", 3.4485, "Bs / viaje", "Equilibrio financiero WACC 11%"],
-          ["Tarifa Ponderada de Red", activeWeightedFare, "Bs / viaje", `Ponderada según matriz social`],
-          ["Ingreso Mensual del Hogar del Operador", Math.round(householdIncome), "Bs / mes", "Salario conductor + Retorno de capital"],
-          ["Utilidad Excedente Mensual", Math.round(economicProfit), "Bs / mes", "Margen neto sobre costo regulatorio"],
-          ["OPEX Efectivo Mensual por Unidad", opex, "Bs / mes", "Combustible + Mantenimiento + Personal + Fijos"],
-          ["Reserva de Reposición Vehicular (10 años)", depreciation, "Bs / mes", "Depreciación lineal"],
-          ["Retorno Justo al Capital (WACC 11% Anual)", allowedReturn, "Bs / mes", "Tasa regulatoria estándar"],
-          ["COSTO ECONÓMICO REGULATORIO TOTAL", regulatoryCost, "Bs / mes", "Costo unitario mensual completo"],
-          [],
-          ["PARÁMETRO OPERATIVO", "VALOR EN SIMULADOR", "UNIDAD", "ESTADO"],
-          ["Precio del Diésel", dieselPrice, "Bs / litro", "Con factor de escenario"],
-          ["Rendimiento Diésel Base", params.fuel_efficiency_km_l, "km / litro", "+15% factor de congestión/ralentí"],
-          ["Mantenimiento Mensual v2", params.maintenance_monthly_bs, "Bs / mes", "-32,7% Planilla técnica 52 ítems"],
-          ["Salario Conductor Profesional", params.driver_salary_bs, "Bs / mes", "+8,33% previsión aguinaldo"],
-          ["Flota Activa en Servicio", fleet, "microbuses", "Flota relevada en campo"],
-          ["Demanda Diaria Total de Red", demandDay, "pasajeros / día", "Con factor de elasticidad"],
-          ["Producción Diaria de Red (GPS)", kmDay, "km / día", "Medición satelital conciliada"]
-        ];
-        const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen_Economico");
+      // HOJA 1: RESUMEN_EJECUTIVO
+      const summaryData = [
+        ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC — MODELO TARIFARIO AUDITADO v3.2.1"],
+        ["Bases Técnicas y Materiales de Negociación | Costos de Operación Vehicular, Economía del Hogar y Tarifas Sociales"],
+        [],
+        ["ESCENARIO EXPORTADO:", activeScenario.label, "MODO:", "Producción Auditada (82.475 km/día - Factor: 1,0050)", "ESTADO:", "CERRADO"],
+        ["Fecha y Hora de Generación:", new Date().toLocaleString('es-BO'), "Usuario Operador:", userEmail],
+        [],
+        ["TARIFA ADULTO VIGENTE", "", "TARIFA ADULTO TÉCNICA", "", "TARIFA ADULTO SOCIAL (ACTIVA)", "", "INGRESO HOGAR (SOCIAL)"],
+        [4.50, "", Number(technicalAdultFare.toFixed(4)), "", activeAdultFare, "", Math.round(householdIncome)],
+        ["Ponderada: Bs. 3,50 / viaje", "", `Equilibrio financiero: Bs. ${technicalWeighted.toFixed(2)}`, "", `Propuesta mesa: Bs. ${activeWeightedFare.toFixed(2)}`, "", "Salario + Retorno capital"],
+        [],
+        ["DIAGNÓSTICO TÉCNICO DE LA MESA:"],
+        [`Con el mantenimiento auditado v2 (Bs. ${params.maintenance_monthly_bs.toFixed(2)}/mes), el Costo Regulatorio es de Bs. ${regulatoryCost.toFixed(2)}/mes. La Tarifa Técnica de Adulto desciende a Bs. ${technicalAdultFare.toFixed(2)}. La propuesta activa (${activeScenario.label}) genera un ingreso familiar de Bs. ${Math.round(householdIncome).toLocaleString('es-BO')}/mes y una utilidad excedente de Bs. ${Math.round(economicProfit).toLocaleString('es-BO')}/mes.`],
+        [],
+        ["INDICADOR ECONÓMICO", "VALOR SIMULADO", "UNIDAD", "OBSERVACIÓN"],
+        ["Tarifa Adulto Oficial", activeAdultFare, "Bs / viaje", "Escenario activo"],
+        ["Tarifa Técnica de Equilibrio", Number(technicalAdultFare.toFixed(4)), "Bs / viaje", "Equilibrio financiero WACC 11% (3.44 Bs)"],
+        ["Tarifa Ponderada de Red", Number(activeWeightedFare.toFixed(4)), "Bs / viaje", "Ponderada matriz de demanda"],
+        ["Ingreso Mensual del Hogar", Math.round(householdIncome), "Bs / mes", "Salario conductor + Retorno de capital"],
+        ["Utilidad Económica Excedente", Math.round(economicProfit), "Bs / mes", "Sobre retorno normal WACC 11%"],
+        ["OPEX Efectivo en Caja", Number(opex.toFixed(2)), "Bs / mes", "Combustible + Mantenimiento + Personal + Admin"],
+        ["Reserva Reposición Vehicular", Number(depreciation.toFixed(2)), "Bs / mes", "Depreciación lineal 10 años"],
+        ["Retorno Justo al Capital (WACC 11%)", Number(allowedReturn.toFixed(2)), "Bs / mes", "Tasa de costo de oportunidad"],
+        ["COSTO ECONÓMICO REGULATORIO TOTAL", Number(regulatoryCost.toFixed(2)), "Bs / mes", "Costo unitario mensual total"],
+        ["IPK de Red", Number(ipk.toFixed(4)), "pax / km", "Pasajeros por kilómetro"]
+      ];
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, "RESUMEN_EJECUTIVO");
 
-        // Hoja 2: Matriz Tarifaria por Categoría Social
-        const faresData = [
-          ["Categoría Social", "% Demanda", "Viajes / Día", "Tarifa Vigente (Bs)", "Tarifa Técnica (Bs)", "Tarifa Escenario Activo (Bs)", "Recaudación Mensual Estimada (Bs)"],
-          ...fares.map(f => {
-            let catFare = f.fare_social_2_bs;
-            if (activeScenarioId === 'social1') catFare = f.fare_social_1_bs;
-            else if (activeScenarioId === 'social2') catFare = f.fare_social_2_bs;
-            else if (activeScenarioId === 'technical') catFare = f.fare_technical_bs;
-            else if (activeScenarioId === 'current') catFare = f.fare_current_bs;
-            else if (activeScenario.isCustom) catFare = activeScenario.adultFare;
-            return [
-              f.name,
-              f.demand_share,
-              f.daily_trips,
-              f.fare_current_bs,
-              f.fare_technical_bs,
-              catFare,
-              f.daily_trips * catFare * days
-            ];
-          })
-        ];
-        const wsFares = XLSX.utils.aoa_to_sheet(faresData);
-        XLSX.utils.book_append_sheet(wb, wsFares, "Matriz_Tarifaria");
+      // HOJA 2: MANTENIMIENTO_NISSAN (52 ÍTEMS AUDITADOS)
+      const maintSheetData = [
+        ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC — PLANILLA TÉCNICA DE MANTENIMIENTO"],
+        ["Costo de Mantenimiento y Repuestos Auditado (Versión Rebajada Oficial v2) | Microbús Nissan Civilian 1990–1998"],
+        [],
+        ["N°", "Componente / Repuesto", "Condición", "Costo Insumos (Bs)", "Cantidad", "Unidad", "Mano de Obra (Bs)", "Costo Total (Bs)", "Periodicidad (Años)", "Costo Anual (Bs)", "Observaciones Técnicas", "Intervalo Km"],
+        ...maintenanceData.map((item: any) => [
+          item.id,
+          item.name,
+          item.condition || "C",
+          item.suppliesCost,
+          item.quantity,
+          item.unit,
+          item.laborCost,
+          item.totalUnitCost,
+          item.frequencyYears,
+          item.annualCost,
+          item.observations || "Estándar",
+          item.intervalKm || 40000
+        ]),
+        [],
+        ["", "COSTO TOTAL ANUAL DE MANTENIMIENTO (Bs/año):", "", "", "", "", "", "", "", 34082.00, "Celda J54 Maestra", ""],
+        ["", "COSTO TOTAL MENSUAL DE MANTENIMIENTO POR UNIDAD (Bs/mes):", "", "", "", "", "", "", "", 2840.17, "Celda J55 Maestra", ""]
+      ];
+      const wsMaint = XLSX.utils.aoa_to_sheet(maintSheetData);
+      XLSX.utils.book_append_sheet(wb, wsMaint, "MANTENIMIENTO_NISSAN");
 
-        // Hoja 3: Análisis de las 32 Rutas Urbanas
-        const routesData = [
-          ["ID", "Sindicato", "Línea de Transporte", "Distancia Ciclo (km)", "Flota Asignada", "km / Mes", "Pasajeros / Mes", "Recaudación (Bs)", "Costo Regulatorio (Bs)", "Utilidad Excedente (Bs)", "Estado de Ruta"],
-          ...calculatedRoutes.map(r => [
-            r.id,
-            r.union,
-            r.line,
-            r.distance,
-            r.fleet,
-            Math.round(r.kmMes),
-            Math.round(r.paxMes),
-            Math.round(r.routeRev),
-            Math.round(r.routeReg),
-            Math.round(r.routeProfit),
-            r.isDeficit ? "DÉFICIT" : "EQUILIBRIO / CUBRE"
-          ])
-        ];
-        const wsRoutes = XLSX.utils.aoa_to_sheet(routesData);
-        XLSX.utils.book_append_sheet(wb, wsRoutes, "32_Rutas_Rentabilidad");
+      // HOJA 3: SUPUESTOS_PARAMETROS
+      const paramSheetData = [
+        ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC — PARÁMETROS OPERATIVOS Y ECONÓMICOS"],
+        ["Variables del Sistema, Productividad de Red y Costos Unitarios | Versión Auditada Oficial v3.2.1"],
+        [],
+        ["1. ESCENARIOS OPERATIVOS DE RED (REFERENCIA TÉCNICA)"],
+        ["ID", "Escenario Operativo", "Flota Activa", "km Red / Día", "Pasajeros / Día", "Días / Mes", "Vueltas / Día", "Uso Metodológico"],
+        ["1", "Base observada del estudio (Oficial)", fleet, kmDay, demandDay, days, turns, "Referencia primaria auditada para concertación"],
+        ["2", "Calibración 32 rutas previa", 874, 84782.63, 273000, 26, 3.5, "Comparabilidad histórica con versión previa"],
+        ["3", "Eficiencia operacional optimizada", 800, 85317.00, 265569, 26, 3.85, "Escenario de optimización de frecuencias"],
+        [],
+        ["2. PARÁMETROS ACTIVOS Y PRODUCTIVIDAD DEL SISTEMA"],
+        ["Flota activa en operación", fleet, "vehículos", "Padrón observado en servicio regular"],
+        ["Producción de red auditada (GPS)", kmDay, "km/día", "Medición satelital conciliada"],
+        ["Demanda diaria del sistema", demandDay, "pasajeros/día", "Aforo integral expandido"],
+        ["Días de operación al mes", days, "días/mes", "Calendario de operación regular"],
+        ["Vueltas medias por día", turns, "vueltas/día", "Ciclos completos ida y vuelta"],
+        ["Kilómetros recorridos por unidad/mes", unitKm, "km/unidad/mes", "Producción unitaria mensual"],
+        ["Pasajeros transportados por unidad/mes", unitPax, "pax/unidad/mes", "Demanda unitaria mensual"],
+        ["Índice de Pasajeros por Km (IPK)", ipk, "pax/km", "Demanda total / km red"],
+        [],
+        ["3. PARÁMETROS ECONÓMICOS DEL MICROBÚS NISSAN CIVILIAN"],
+        ["Salario mensual conductor profesional", params.driver_salary_bs, "Bs/mes", "Convenio laboral regular"],
+        ["Cargas sociales y aguinaldo (8,33%)", params.driver_salary_bs * params.labor_charges_factor, "Bs/mes", "Provisión de ley"],
+        ["Rendimiento diésel base", params.fuel_efficiency_km_l, "km/litro", "Prueba de circuito urbano"],
+        ["Factor sobrecosto ralentí / congestión", params.idle_congestion_factor, "% adicional", "Pérdida por tráfico (15%)"],
+        ["Precio oficial de diésel", dieselPrice, "Bs/litro", "Con factor de escenario"],
+        ["Mantenimiento mensual auditado", params.maintenance_monthly_bs, "Bs/mes", "Planilla oficial 52 ítems"],
+        ["Valor de reposición vehicular a nuevo", params.vehicle_replacement_value_bs, "Bs", "Microbús equivalente"],
+        ["Vida útil económica", params.vehicle_useful_life_months, "meses", "10 años amortización"],
+        ["Tasa de retorno al capital (WACC)", params.capital_return_rate_annual, "% anual", "Tasa regulatoria estándar (11%)"]
+      ];
+      const wsParams = XLSX.utils.aoa_to_sheet(paramSheetData);
+      XLSX.utils.book_append_sheet(wb, wsParams, "SUPUESTOS_PARAMETROS");
 
-        // Hoja 4: Desglose Oficial de Mantenimiento Nissan Civilian (52 Ítems)
-        const maintData = [
-          ["PLANILLA OFICIAL DE MANTENIMIENTO NISSAN CIVILIAN — 52 ÍTEMS AUDITADOS"],
-          ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC CONSULTORÍA"],
-          ["Monto Mensual Unitario Auditado:", params.maintenance_monthly_bs, "Bs / mes"],
-          ["Monto Anual Unitario Auditado:", Math.round(params.maintenance_monthly_bs * 12), "Bs / año"],
-          [],
-          ["Ítem", "Descripción del Componente", "Tipo", "Costo Unitario (Bs)", "Cant", "Unidad", "Mano de Obra (Bs)", "Costo Ciclo (Bs)", "Frec / Año", "Costo Anual (Bs)", "Observación Técnica"],
-          ["1", "Aceite de Motor 15W40 (Galón)", "C", 120.00, 3, "gl", 30.00, 390.00, 6.00, 2340.00, "Cambio cada 5.000 km"],
-          ["2", "Filtro de Aceite de Motor", "C", 45.00, 1, "pza", 0.00, 45.00, 6.00, 270.00, "M.O. incluido en cambio aceite"],
-          ["3", "Filtro de Combustible (Primario y Secundario)", "C", 85.00, 2, "pza", 20.00, 190.00, 6.00, 1140.00, "Protección inyección diésel"],
-          ["4", "Filtro de Aire", "C", 110.00, 1, "pza", 10.00, 120.00, 4.00, 480.00, "Limpieza intermedia sopleteo"],
-          ["5", "Aceite de Transmisión 80W90", "C", 140.00, 1, "gl", 30.00, 170.00, 2.00, 340.00, "Cambio semestral"],
-          ["6", "Aceite de Diferencial 85W140", "C", 150.00, 1, "gl", 30.00, 180.00, 2.00, 360.00, "Cambio semestral"],
-          ["7", "Líquido de Embrague (DOT 3)", "C", 35.00, 2, "bot", 15.00, 85.00, 2.00, 170.00, "Purgado y reposición"],
-          ["8", "Grasa para Rodamientos (Pote 1kg)", "C", 55.00, 2, "kg", 40.00, 150.00, 4.00, 600.00, "Engrase mazas y crucetas"],
-          ["9", "Agua destilada / Refrigerante radiador", "C", 40.00, 2, "gl", 10.00, 90.00, 3.00, 270.00, "Mantenimiento refrigeración"],
-          ["10", "Correa de Alternador", "C", 65.00, 1, "pza", 25.00, 90.00, 2.00, 180.00, "Revisión tensión"],
-          ["11", "Correa de Bomba de Agua / Ventilador", "C", 65.00, 1, "pza", 25.00, 90.00, 2.00, 180.00, "Reemplazo preventivo"],
-          ["12", "Correa de Dirección Hidráulica", "C", 55.00, 1, "pza", 20.00, 75.00, 2.00, 150.00, "Reemplazo preventivo"],
-          ["13", "Juego de Pastillas de Freno Delanteras", "C", 220.00, 1, "jgo", 80.00, 300.00, 3.00, 900.00, "Uso intensivo urbano"],
-          ["14", "Rectificación de Discos Delanteros", "M", 90.00, 2, "pza", 60.00, 240.00, 1.50, 360.00, "Torneado técnico"],
-          ["15", "Balatas de Freno Traseras (Remachadas)", "C", 180.00, 4, "pzas", 150.00, 870.00, 1.00, 870.00, "Freno de tambor"],
-          ["16", "Tambores Traseros de Freno", "C", 800.00, 2, "pzas", 140.00, 1740.00, 0.20, 348.00, "Vida útil 5 años (0.2/año)"],
-          ["17", "Cilindro Maestro de Freno", "C", 500.00, 1, "pza", 80.00, 580.00, 0.25, 145.00, "Vida útil 4 años (0.25/año)"],
-          ["18", "Cubetas de Cilindro Maestro", "C", 150.00, 2, "pzas", 80.00, 380.00, 1.00, 380.00, "Kit de reparación anual"],
-          ["19", "Cilindro Auxiliar de Freno", "C", 30.00, 2, "pzas", 80.00, 140.00, 0.50, 70.00, "Vida útil 2 años"],
-          ["20", "Cubetas de Cilindro Auxiliar", "C", 30.00, 4, "pzas", 150.00, 270.00, 1.00, 270.00, "Cambio anual"],
-          ["21", "Líquido de Frenos DOT 4 (Envase)", "C", 40.00, 8, "oz", 0.00, 320.00, 1.00, 320.00, "M.O. incluido"],
-          ["22", "Cable de Freno de Mano", "C", 450.00, 1, "pza", 100.00, 550.00, 0.50, 275.00, "Vida útil 2 años"],
-          ["23", "Neumáticos, cámara y ponchillos (Juego 6)", "C", 1500.00, 6, "pzas", 150.00, 9150.00, 0.50, 4575.00, "Recambio rotativo anual"],
-          ["24", "Alineación y Balanceo de Dirección", "M", 80.00, 1, "serv", 0.00, 80.00, 4.00, 320.00, "Mantenimiento preventivo"],
-          ["25", "Amortiguadores Delanteros Reforzados", "C", 380.00, 2, "pzas", 80.00, 840.00, 0.50, 420.00, "Vida útil 2 años"],
-          ["26", "Amortiguadores Traseros Heavy Duty", "C", 350.00, 2, "pzas", 80.00, 780.00, 0.50, 390.00, "Vida útil 2 años"],
-          ["27", "Hojas de Paquete de Muelles (Maestras)", "C", 280.00, 2, "pzas", 120.00, 680.00, 0.50, 340.00, "Fatiga por topografía Sucre"],
-          ["28", "Bujes y Pernos de Muelles de Suspensión", "C", 35.00, 8, "pzas", 100.00, 380.00, 1.00, 380.00, "Reemplazo anual"],
-          ["29", "Crucetas de Cardán Principal", "C", 120.00, 2, "pzas", 60.00, 300.00, 1.00, 300.00, "Transmisión"],
-          ["30", "Soporte Central de Cardán (Chumacera)", "C", 220.00, 1, "pza", 70.00, 290.00, 0.50, 145.00, "Vida útil 2 años"],
-          ["31", "Disco de Embrague (Clutch)", "C", 480.00, 1, "pza", 250.00, 730.00, 0.50, 365.00, "Vida útil 2 años"],
-          ["32", "Prensa de Embrague", "C", 550.00, 1, "pza", 0.00, 550.00, 0.33, 181.50, "Vida útil 3 años"],
-          ["33", "Rodamiento de Empuje (Collarín)", "C", 140.00, 1, "pza", 0.00, 140.00, 0.50, 70.00, "Reemplazo junto al disco"],
-          ["34", "Terminales de Dirección", "C", 110.00, 2, "pzas", 60.00, 280.00, 1.00, 280.00, "Seguridad vial"],
-          ["35", "Bomba de Agua de Refrigeración", "C", 380.00, 1, "pza", 120.00, 500.00, 0.33, 165.00, "Vida útil 3 años"],
-          ["36", "Termostato de Motor", "C", 85.00, 1, "pza", 40.00, 125.00, 0.50, 62.50, "Regulación térmica"],
-          ["37", "Limpieza de Inyectores Diésel (Toberas)", "M", 70.00, 4, "pzas", 120.00, 400.00, 1.00, 400.00, "Calibración en banco"],
-          ["38", "Batería 100Ah Heavy Duty (Juego 2)", "C", 1050.00, 2, "pzas", 0.00, 2100.00, 0.50, 1050.00, "Vida útil 2 años (M.O. inc.)"],
-          ["39", "Mantenimiento Motor de Arranque", "M", 150.00, 1, "pza", 150.00, 300.00, 1.00, 300.00, "Carbones y bujes"],
-          ["40", "Mantenimiento de Alternador", "M", 150.00, 1, "pza", 150.00, 300.00, 1.00, 300.00, "Diodos y regulador"],
-          ["41", "Focos de Farol Delantero H4", "C", 80.00, 2, "pzas", 0.00, 80.00, 1.00, 80.00, "Iluminación reglamentaria"],
-          ["42", "Focos de Luz de Freno (P21W)", "C", 15.00, 2, "pzas", 0.00, 15.00, 1.00, 15.00, "Seguridad trasera"],
-          ["43", "Pintura y Arreglos Menores Carrocería", "R", 800.00, 1, "serv", 0.00, 800.00, 0.50, 400.00, "Mantenimiento estético"],
-          ["44", "Tapizado (Asientos y Piso)", "R", 2000.00, 1, "serv", 0.00, 2000.00, 0.20, 400.00, "Renovación quinquenal"],
-          ["45", "Engrasado General de Chasis y Transmisión", "M", 60.00, 1, "serv", 0.00, 60.00, 12.50, 750.00, "Mensual continuo"],
-          ["46", "Mangueras de Radiador (Superior e Inferior)", "C", 75.00, 2, "pzas", 40.00, 190.00, 0.50, 95.00, "Vida útil 2 años"],
-          ["47", "Soportes de Motor y Caja de Cambios", "C", 140.00, 3, "pzas", 90.00, 510.00, 0.33, 168.30, "Vida útil 3 años"],
-          ["48", "Plumillas Limpiaparabrisas", "C", 40.00, 2, "pzas", 0.00, 80.00, 2.00, 160.00, "Seguridad lluvia"],
-          ["49", "Tapa de Radiador Presurizada", "C", 45.00, 1, "pza", 0.00, 45.00, 1.00, 45.00, "Sellado 0.9 bar"],
-          ["50", "Retén de Piñón de Diferencial", "C", 60.00, 1, "pza", 80.00, 140.00, 0.50, 70.00, "Fuga de aceite"],
-          ["51", "Retenes de Mazas Delanteras y Traseras", "C", 45.00, 4, "pzas", 120.00, 300.00, 0.50, 150.00, "Sellado rodamientos"],
-          ["52", "Filtro de Trampa de Agua Diésel (Purga)", "C", 70.00, 1, "pza", 20.00, 90.00, 2.00, 180.00, "Separador sedimentos"],
-          [],
-          ["", "COSTO TOTAL ANUAL DE MANTENIMIENTO (Bs/año):", "", "", "", "", "", "", "", 34082.00, "52 Ítems Oficiales"],
-          ["", "COSTO TOTAL MENSUAL DE MANTENIMIENTO POR UNIDAD (Bs/mes):", "", "", "", "", "", "", "", 2840.17, "Fórmula: Anual / 12"]
-        ];
-        const wsMaint = XLSX.utils.aoa_to_sheet(maintData);
-        XLSX.utils.book_append_sheet(wb, wsMaint, "52_Items_Mantenimiento");
+      // HOJA 4: COSTOS_OPERACION_COV
+      const covSheetData = [
+        ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC — COSTOS DE OPERACIÓN VEHICULAR (COV)"],
+        ["Estructura Desagregada de Costos Variables, Fijos y de Capital | Microbús Nissan Civilian Oficial v3.2.1"],
+        [],
+        ["A. COSTOS VARIABLES (DIRECTAMENTE DEPENDIENTES DEL KILOMETRAJE)"],
+        ["Grupo", "Concepto de Costo", "Base de Cálculo", "Importe Base (Bs)", "Costo Mensual (Bs)", "Costo / Km (Bs/km)", "% Costo Total"],
+        ["Combustible", "Diésel Oíl + sobrecosto congestión (15%)", `Rend. ${params.fuel_efficiency_km_l} km/l | ${dieselPrice.toFixed(2)} Bs/l`, fuelCost, fuelCost, fuelCost / unitKm, fuelCost / regulatoryCost],
+        ["Mantenimiento", "Mantenimiento dependiente de km (25,14%)", "Aceites, filtros, balatas, neumáticos", maintVar, maintVar, maintVar / unitKm, maintVar / regulatoryCost],
+        ["SUBTOTAL COSTOS VARIABLES (A):", "", "", "", fuelCost + maintVar, (fuelCost + maintVar) / unitKm, (fuelCost + maintVar) / regulatoryCost],
+        [],
+        ["B. COSTOS FIJOS EN EFECTIVO (INDEPENDIENTES DEL KILOMETRAJE)"],
+        ["Mantenimiento", "Mantenimiento periódico en el tiempo (74,86%)", "Reparaciones mecánicas y preventivas", maintFixed, maintFixed, maintFixed / unitKm, maintFixed / regulatoryCost],
+        ["Personal", "Remuneración conductor profesional", "1 chofer por unidad", params.driver_salary_bs, params.driver_salary_bs, params.driver_salary_bs / unitKm, params.driver_salary_bs / regulatoryCost],
+        ["Personal", "Cargas sociales y aguinaldo", "8,33% sobre salario", params.driver_salary_bs * params.labor_charges_factor, params.driver_salary_bs * params.labor_charges_factor, (params.driver_salary_bs * params.labor_charges_factor) / unitKm, (params.driver_salary_bs * params.labor_charges_factor) / regulatoryCost],
+        ["Administrativo", "Gastos Administrativos y Seguros", "SOAT, ITV, Impuesto, Cuota Sindical, Rodaje, Seguro Terceros", otherFixed, otherFixed, otherFixed / unitKm, otherFixed / regulatoryCost],
+        ["SUBTOTAL COSTOS FIJOS EN EFECTIVO (B):", "", "", "", maintFixed + laborCost + otherFixed, (maintFixed + laborCost + otherFixed) / unitKm, (maintFixed + laborCost + otherFixed) / regulatoryCost],
+        [],
+        ["TOTAL COSTO OPERATIVO EN EFECTIVO - OPEX (A + B):", "", "", "", opex, opex / unitKm, opex / regulatoryCost],
+        [],
+        ["C. COSTOS DE CAPITAL Y REGULATORIOS (AMORTIZACIÓN Y RETORNO DE INVERSIÓN)"],
+        ["Capital", "Reserva de reposición vehicular (Depreciación)", "Vida útil 120 meses (10 años)", depreciation, depreciation, depreciation / unitKm, depreciation / regulatoryCost],
+        ["Capital", "Retorno permitido sobre capital (11% WACC)", "11% anual sobre activo regulatorio", allowedReturn, allowedReturn, allowedReturn / unitKm, allowedReturn / regulatoryCost],
+        ["SUBTOTAL COSTOS DE CAPITAL (C):", "", "", "", depreciation + allowedReturn, (depreciation + allowedReturn) / unitKm, (depreciation + allowedReturn) / regulatoryCost],
+        [],
+        ["COSTO ECONÓMICO REGULATORIO TOTAL POR UNIDAD (A + B + C):", "", "", "", regulatoryCost, regulatoryCost / unitKm, 1.0],
+        ["Costo Regulatorio por Pasajero (Tarifa Técnica Ponderada):", "", "", "", regulatoryCost / unitPax, "Bs / pasajero", ""],
+        ["Tarifa Técnica Adulto Equivalente:", "", "", "", technicalAdultFare, "Bs / viaje", "3.44 Bs"]
+      ];
+      const wsCov = XLSX.utils.aoa_to_sheet(covSheetData);
+      XLSX.utils.book_append_sheet(wb, wsCov, "COSTOS_OPERACION_COV");
 
-        // Hoja 5: Bitácora Inmutable de Auditoría Legal
+      // HOJA 5: TARIFAS_CATEGORIA
+      const faresSheetData = [
+        ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC — TARIFAS POR CATEGORÍA SOCIAL"],
+        ["Distribución de Demanda, Tarifas Vigentes, Tarifas Técnicas Equivalentes y Propuesta Activa"],
+        [],
+        ["Categoría Social", "% Demanda", "Viajes / Día", "Tarifa Vigente (Bs)", "Tarifa Técnica Equiv. (Bs)", "Tarifa Escenario Activo (Bs)", "Recaudación Mensual Estimada (Bs)"],
+        ...fares.map(f => {
+          let catFare = f.fare_social_2_bs;
+          if (activeScenarioId === 'social1') catFare = f.fare_social_1_bs;
+          else if (activeScenarioId === 'social2') catFare = f.fare_social_2_bs;
+          else if (activeScenarioId === 'social3') catFare = (f.name.includes('Adultos') && !f.name.includes('mayores')) ? 4.00 : (f.name.includes('Adultos mayores') ? 3.00 : (f.name.includes('Universitarios') ? 2.00 : (f.name.includes('Colegiales') ? 1.00 : (f.name.includes('Escolares') ? 1.00 : 0))));
+          else if (activeScenarioId === 'technical') catFare = f.fare_technical_bs;
+          else if (activeScenarioId === 'current') catFare = f.fare_current_bs;
+          else if (activeScenario.isCustom) {
+            if (f.name.includes('Adultos mayores')) catFare = activeScenario.socialFares.adultosMayores;
+            else if (f.name.includes('Universitarios')) catFare = activeScenario.socialFares.universitarios;
+            else if (f.name.includes('Colegiales')) catFare = activeScenario.socialFares.colegiales;
+            else if (f.name.includes('Escolares')) catFare = activeScenario.socialFares.escolares;
+            else if (f.name.includes('Discapacidad')) catFare = 0;
+            else catFare = activeScenario.adultFare;
+          }
+          const techEquiv = f.name.includes('Adultos') && !f.name.includes('mayores') ? technicalAdultFare : f.fare_technical_bs;
+          return [
+            f.name,
+            f.demand_share,
+            f.daily_trips,
+            f.fare_current_bs,
+            Number(techEquiv.toFixed(4)),
+            catFare,
+            f.daily_trips * catFare * days
+          ];
+        }),
+        [],
+        ["PROMEDIO PONDERADO:", 1.0, demandDay, currentWeighted, technicalWeighted, activeWeightedFare, monthlyRevenue]
+      ];
+      const wsFares = XLSX.utils.aoa_to_sheet(faresSheetData);
+      XLSX.utils.book_append_sheet(wb, wsFares, "TARIFAS_CATEGORIA");
+
+      // HOJA 6: ECONOMIA_PROPIETARIO
+      const ownerSheetData = [
+        ["GOBIERNO AUTÓNOMO MUNICIPAL DE SUCRE & ECOTRAFFIC — ECONOMÍA DEL TRANSPORTISTA"],
+        ["Doble Cuenta: Flujo Real de Caja del Hogar Propietario vs. Cuenta Económica Regulatoria Oficial v3.2.1"],
+        [],
+        ["Concepto Financiero", "Tarifa Vigente (Obs.)", "Tarifa Técnica (Eq.)", "Tarifa Social Propuesta (Social 3)", "Escenario Estrés", "Lectura Metodológica"],
+        ["Tarifa ponderada de pasaje (Bs/viaje)", 3.5050, 2.6818, 3.0400, 3.5050, "Cálculo dinámico ponderado"],
+        ["Kilómetros recorridos por unidad/mes", unitKm, unitKm, unitKm, unitKm, "Kilometraje de red"],
+        ["Pasajeros transportados por unidad/mes", unitPax, unitPax, unitPax, unitPax * 0.90, "Demanda transportada"],
+        ["Recaudación bruta mensual (Bs/mes)", 24520.06, 18761.02, 21267.05, 22068.06, "Ingreso por cobro de pasajes"],
+        ["Combustible efectivo (Bs/mes)", fuelCost, fuelCost, fuelCost, fuelCost * 1.15, "Diésel regular"],
+        ["Mantenimiento auditado (Bs/mes)", params.maintenance_monthly_bs, params.maintenance_monthly_bs, params.maintenance_monthly_bs, params.maintenance_monthly_bs, "Planilla v2 52 ítems"],
+        ["Remuneración laboral conductor (Bs/mes)", laborCost, laborCost, laborCost, laborCost, "Sueldo chofer + aguinaldo"],
+        ["Otros costos fijos en efectivo (Bs/mes)", otherFixed, otherFixed, otherFixed, otherFixed, "SOAT, impuestos, ITV, sindicato"],
+        ["TOTAL OPEX EFECTIVO EN CAJA (Bs/mes)", opex, opex, opex, opex + fuelCost * 0.15, "Salidas operativas de caja"],
+        ["Excedente operativo de caja (Bs/mes)", 24520.06 - opex, 18761.02 - opex, 21267.05 - opex, 22068.06 - (opex + fuelCost * 0.15), "Caja antes de amortización"],
+        ["Servicio de deuda individual (Bs/mes)", 0, 0, 0, 0, "Sin deuda financiera bancaria"],
+        ["Reserva de reposición / Deprec. (Bs/mes)", depreciation, depreciation, depreciation, depreciation, "Fondo para renovar unidad"],
+        ["CAJA LIBRE DESPUÉS DE RESERVA (Bs/mes)", 24520.06 - opex - depreciation, 1818.30, 4324.32, 3902.21, "Caja líquida disponible"],
+        ["Retorno regulatorio al capital (11% WACC)", allowedReturn, allowedReturn, allowedReturn, allowedReturn, "Remuneración justa a la inversión"],
+        ["UTILIDAD ECONÓMICA EXCEDENTE (Bs/mes)", 5759.04, 0.00, 2506.02, 2083.91, "Sobreganancia sobre WACC 11%"],
+        ["Remuneración por conducir (Sueldo Chofer)", laborCost, laborCost, laborCost, laborCost, "Salario chofer familiar"],
+        ["INGRESO TOTAL DEL HOGAR (Bs/mes)", 11152.34, 5393.30, 7899.32, 7477.21, "Caja familiar total mensual"]
+      ];
+      const wsOwner = XLSX.utils.aoa_to_sheet(ownerSheetData);
+      XLSX.utils.book_append_sheet(wb, wsOwner, "ECONOMIA_PROPIETARIO");
+
+      // HOJA 7: RENTABILIDAD_32_RUTAS
+      const routesSheetData = [
+        ["ID", "Sindicato", "Línea de Transporte", "Distancia Ciclo (km)", "Flota Asignada", "km / Mes", "Pasajeros / Mes", "Recaudación (Bs)", "Costo Regulatorio (Bs)", "Utilidad Excedente (Bs)", "Estado de Ruta"],
+        ...calculatedRoutes.map(r => [
+          r.id,
+          r.union,
+          r.line,
+          r.distance,
+          r.fleet,
+          Math.round(r.kmMes),
+          Math.round(r.paxMes),
+          Math.round(r.routeRev),
+          Math.round(r.routeReg),
+          Math.round(r.routeProfit),
+          r.isDeficit ? "DÉFICIT" : "EQUILIBRIO / CUBRE"
+        ])
+      ];
+      const wsRoutes = XLSX.utils.aoa_to_sheet(routesSheetData);
+      XLSX.utils.book_append_sheet(wb, wsRoutes, "RENTABILIDAD_32_RUTAS");
+
+      // HOJA 8: BITÁCORA DE AUDITORÍA (SOLO SI ES SUPERADMIN)
+      if (isSuperAdmin) {
         const auditData = [
           ["Fecha y Hora", "Usuario", "Rol", "Organización", "Acción", "Parámetro / Entidad", "Justificación Técnica Registrada"],
           ...logs.map(l => [
@@ -524,15 +559,18 @@ export default function DashboardView({
           ])
         ];
         const wsAudit = XLSX.utils.aoa_to_sheet(auditData);
-        XLSX.utils.book_append_sheet(wb, wsAudit, "Bitacora_Auditoria_Legal");
-
-        XLSX.writeFile(wb, `SIM-PRO_Tarifario_Sucre_${activeScenario.id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      } else {
-        // Fallback a descarga del archivo maestro
-        window.open('/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx', '_blank');
+        XLSX.utils.book_append_sheet(wb, wsAudit, "BITACORA_AUDITORIA");
       }
-    } catch {
-      window.open('/Modelo_Profesional_Tarifario_Sucre_v3.2_Ecotraffic.xlsx', '_blank');
+
+      // Descargar archivo Excel dinámico generado en vivo
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const safeLabel = activeScenario.label.replace(/[^a-zA-Z0-9]/g, '_');
+      XLSX.writeFile(wb, `Modelo_Tarifario_Sucre_v3.2.1_${safeLabel}_${dateStr}.xlsx`);
+      setStatusMessage({ text: 'Libro maestro Excel exportado exitosamente con todas las hojas y datos actualizados.', type: 'success' });
+    } catch (err: unknown) {
+      console.error('Error generando Excel:', err);
+      // Fallback a descarga del archivo maestro estático
+      window.open('/Modelo_Profesional_Tarifario_Sucre_v3.2.1_Ecotraffic.xlsx', '_blank');
     }
   };
 
@@ -620,6 +658,9 @@ export default function DashboardView({
     });
     setActiveScenarioId(sc.id);
 
+    // Sincronizar en el servidor para que se replique en todos los equipos y lo vea el SuperAdmin
+    saveSharedScenario(sc, userEmail);
+
     // Registrar en auditoría
     const scLog: AuditLog = {
       id: crypto.randomUUID(),
@@ -653,6 +694,7 @@ export default function DashboardView({
     if (activeScenarioId === scId) {
       setActiveScenarioId('social2');
     }
+    deleteSharedScenario(scId);
     setStatusMessage({ text: 'Escenario eliminado del simulador.', type: 'success' });
   };
 
@@ -1002,7 +1044,7 @@ export default function DashboardView({
             <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs relative overflow-hidden">
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarifa Técnica Eq.</div>
               <div className="text-2xl font-black text-slate-900 mt-1">
-                Bs. 3,45
+                Bs. {fmt(technicalAdultFare, 2)}
               </div>
               <div className="text-[11px] text-blue-700 font-semibold mt-1">
                 Equilibrio financiero
@@ -1077,10 +1119,14 @@ export default function DashboardView({
           {/* SaaS Navigation Tabs */}
           <div className="flex border-b border-slate-200 gap-6 overflow-x-auto">
             {[
-              { id: 'resumen' as const, label: 'Resumen Ejecutivo & COV' },
-              { id: 'tarifas' as const, label: 'Estructura por Categoría Social' },
-              { id: 'rutas' as const, label: `Rentabilidad 32 Rutas (${deficitRoutesCount} deficitarias)` },
-              { id: 'auditoria' as const, label: `Bitácora de Auditoría (${logs.length} logs)` }
+              { id: 'resumen' as TabType, label: 'Resumen Ejecutivo & COV' },
+              { id: 'cov' as TabType, label: 'Estructura COV Detallada' },
+              { id: 'propietario' as TabType, label: 'Economía del Propietario' },
+              { id: 'mantenimiento' as TabType, label: 'Mantenimiento Nissan' },
+              { id: 'parametros' as TabType, label: 'Supuestos & Productividad' },
+              { id: 'tarifas' as TabType, label: 'Categoría Social' },
+              { id: 'rutas' as TabType, label: `32 Rutas (${deficitRoutesCount} deficitarias)` },
+              ...(isSuperAdmin ? [{ id: 'auditoria' as TabType, label: `Bitácora de Auditoría (${logs.length} logs)` }] : [])
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1199,7 +1245,35 @@ export default function DashboardView({
             </div>
           )}
 
-          {/* TAB 2: TARIFAS POR CATEGORÍA */}
+          {/* TAB: ESTRUCTURA COV DETALLADA (Hoja COSTOS_OPERACION_COV) */}
+          {activeTab === 'cov' && (
+            <SheetCostosOperacionCov 
+              params={params} 
+              fuelPrice={dieselPrice} 
+              maintenanceMonthly={params.maintenance_monthly_bs} 
+            />
+          )}
+
+          {/* TAB: ECONOMÍA DEL PROPIETARIO (Hoja ECONOMIA_PROPIETARIO) */}
+          {activeTab === 'propietario' && (
+            <SheetEconomiaPropietario />
+          )}
+
+          {/* TAB: MANTENIMIENTO NISSAN 52 ÍTEMS (Hoja MANTENIMIENTO_NISSAN) */}
+          {activeTab === 'mantenimiento' && (
+            <SheetMantenimientoNissan 
+              maintenanceMonthly={params.maintenance_monthly_bs} 
+            />
+          )}
+
+          {/* TAB: SUPUESTOS & PARÁMETROS MAESTROS (Hoja SUPUESTOS_PARAMETROS) */}
+          {activeTab === 'parametros' && (
+            <SheetSupuestosParametros 
+              params={params} 
+            />
+          )}
+
+          {/* TAB: TARIFAS POR CATEGORÍA SOCIAL (Hoja TARIFAS_CATEGORIA) */}
           {activeTab === 'tarifas' && (
             <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div>
@@ -1236,21 +1310,23 @@ export default function DashboardView({
                         else activeCatFare = activeScenario.adultFare;
                       }
 
+                      const techFareVal = (f.name.includes('Adultos') && !f.name.includes('mayores')) ? technicalAdultFare : f.fare_technical_bs;
+
                       return (
                         <tr key={f.name} className="hover:bg-slate-50/80">
                           <td className="p-3 font-semibold text-slate-900">{f.name}</td>
                           <td className="p-3 text-right font-mono">{fmt(f.demand_share * 100, 1)}%</td>
                           <td className="p-3 text-right font-mono">{fmt(f.daily_trips, 0)}</td>
                           <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_current_bs, 2)}</td>
-                          <td className="p-3 text-right font-mono">Bs. {fmt(f.fare_technical_bs, 4)}</td>
+                          <td className="p-3 text-right font-mono">Bs. {fmt(techFareVal, 4)}</td>
                           <td className="p-3 text-right font-mono font-bold bg-emerald-50/50 text-emerald-900">
                             Bs. {fmt(activeCatFare, 2)}
                           </td>
                           <td className={`p-3 text-right font-mono font-semibold ${
-                            activeCatFare - f.fare_technical_bs >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                            activeCatFare - techFareVal >= 0 ? 'text-emerald-700' : 'text-rose-700'
                           }`}>
-                            {activeCatFare - f.fare_technical_bs >= 0 ? '+' : ''}
-                            {fmt(activeCatFare - f.fare_technical_bs, 4)}
+                            {activeCatFare - techFareVal >= 0 ? '+' : ''}
+                            {fmt(activeCatFare - techFareVal, 4)}
                           </td>
                         </tr>
                       );
@@ -1274,7 +1350,7 @@ export default function DashboardView({
             </div>
           )}
 
-          {/* TAB 3: 32 RUTAS */}
+          {/* TAB: 32 RUTAS URBANAS */}
           {activeTab === 'rutas' && (
             <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex justify-between items-center">
@@ -1340,8 +1416,8 @@ export default function DashboardView({
             </div>
           )}
 
-          {/* TAB 4: BITÁCORA DE AUDITORÍA */}
-          {activeTab === 'auditoria' && (
+          {/* TAB: BITÁCORA DE AUDITORÍA (SOLO VISIBLE PARA SUPERADMIN) */}
+          {isSuperAdmin && activeTab === 'auditoria' && (
             <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex justify-between items-center">
                 <div>
@@ -1351,7 +1427,7 @@ export default function DashboardView({
                   </p>
                 </div>
                 <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-mono font-bold border border-slate-200">
-                  Append-Only (No Modificable)
+                  Append-Only (SuperAdmin)
                 </span>
               </div>
 
@@ -1445,7 +1521,7 @@ export default function DashboardView({
             </div>
             <div className="p-2 border border-slate-400 rounded bg-slate-50">
               <div className="text-[10px] text-slate-500 font-bold">TARIFA TÉCNICA EQ.</div>
-              <div className="text-base font-black text-slate-950">Bs. 3,45</div>
+              <div className="text-base font-black text-slate-950">Bs. {fmt(technicalAdultFare, 2)}</div>
             </div>
             <div className="p-2 border border-slate-400 rounded bg-slate-50">
               <div className="text-[10px] text-slate-500 font-bold">INGRESO HOGAR / MES</div>

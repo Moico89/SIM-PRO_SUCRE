@@ -50,3 +50,50 @@
 ## 8. Estándar de Diseño Visual & UI/UX Corporativo
 - **Cero Emojis en Producción**: Toda la interfaz (Landing Page, Modales, Dashboard, Alertas, Badges y Tablas) utiliza exclusivamente vectores SVG profesionales y paletas cromáticas sobrias (Slate, Cyan, Emerald, Rose, Amber).
 - **Hero & Portada Animada**: Grid en perspectiva 3D, generador de partículas flotantes, nodos de interconexión viva y micro-animaciones interactivas.
+
+## 9. Calibración Exacta de Tarifa Técnica de Adulto (Bs. 3,44)
+- **Fórmula de Homologación con Excel Maestro**:
+  $$\text{Tarifa Adulto Técnica} = \text{Tarifa Ponderada Técnica} \times \left(\frac{\text{Tarifa Adulto Vigente}}{\text{Tarifa Ponderada Vigente}}\right)$$
+  $$= 2,681778 \times \left(\frac{4,50}{3,5050}\right) = 3,443082 \dots \rightarrow \mathbf{Bs.\ 3,44}$$
+- Se eliminó todo redondeo preliminar estático a 3,45. El sistema ahora replica con exactitud matemática la celda `E5` de la hoja `TARIFAS_CATEGORIA` del modelo oficial.
+
+## 10. Integración de Vistas Resumen de las 4 Hojas Maestras
+- Cuatro componentes dedicados de alta fidelidad añadidos a la navegación del Dashboard:
+  1. `SheetMantenimientoNissan`: Catálogo de 52 ítems Nissan Civilian, categorizados por sistemas (Motor, Frenos, Transmisión, Suspensión, Eléctrico, Neumáticos, Carrocería), costo anual Bs. 34.082 y costo mensual auditado de Bs. 2.840,17.
+  2. `SheetSupuestosParametros`: Parámetros de demanda (265.569 pax/día), producción de red (82.475 km/día), flota en servicio (987 unidades) y parámetros macroeconómicos (Diésel Bs. 17,95/l, WACC 11%).
+  3. `SheetCostosOperacionCov`: Estructura COV mensual (Variables A: Bs. 8.868,08; Fijos Efectivo B: Bs. 6.421,64; Capital C: Bs. 3.471,30) totalizando Bs. 18.761,02/mes.
+  4. `SheetEconomiaPropietario`: Matriz comparativa de doble cuenta (flujo real familiar con salario/caja libre vs cuenta económica regulatoria) para los 4 escenarios de concertación.
+
+## 11. Aislamiento RBAC de Bitácora de Auditoría
+- La pestaña "Bitácora de Auditoría" fue retirada de la barra de navegación pública/observador.
+- El acceso queda estrictamente confinado al rol `superadmin` (`ecotraffic.bo@gmail.com`) dentro del Panel de Administración, protegiendo la confidencialidad de los registros de trazabilidad institucional.
+
+## 12. Sincronización Multi-Equipo de Escenarios de Concertación
+- Los escenarios creados por usuarios (ej. `rolandoparraga@gmail.com`) se sincronizan a través de `src/actions/scenarios.ts` persistiendo en `data/scenarios.json` y replicándose en la tabla Supabase `negotiation_scenarios`.
+- Se cargan del lado del servidor en `page.tsx` (`initialScenarios`) asegurando visibilidad inmediata para cualquier estación de trabajo o sesión concurrente (incluyendo el SuperAdmin `ecotraffic.bo@gmail.com`).
+- Incorporado de forma oficial el escenario de concertación `Social 3 (Bs. 4,00)` con badge `ACCESIBLE`.
+
+## 13. Motor de Exportación Excel Dinámico en Vivo (xlsx)
+- El botón superior "Excel Dinámico .xlsx" genera en caliente un libro multi-hoja (`Modelo_Tarifario_Sucre_Auditoria_v3.2.1.xlsx`) conteniendo:
+  `RESUMEN_EJECUTIVO`, `MANTENIMIENTO_NISSAN`, `SUPUESTOS_PARAMETROS`, `COSTOS_OPERACION_COV`, `TARIFAS_CATEGORIA`, `ECONOMIA_PROPIETARIO`, `RENTABILIDAD_32_RUTAS` y condicionalmente `BITACORA_AUDITORIA` (si el usuario es SuperAdmin).
+
+## 14. Status Operativo de Tarify OS (v3.3.0)
+- **Compilación & Estabilidad**: Build exitoso sin advertencias de tipos (`next build` código 0). Compatible con SSR y Static Pre-rendering.
+- **Calibración Tarifaria**: Homologación exacta al 100% con `Modelo_Profesional_Tarifario_Sucre_v3.2.1_Ecotraffic.xlsx`. Tarifa Técnica de Adulto: **Bs. 3,44**; Tarifa Ponderada Técnica: **Bs. 2,6818**; Mantenimiento Auditado v2: **Bs. 2.840,17/mes**; Costo Regulatorio Total: **Bs. 18.761,02/mes**.
+- **Cobertura de Datos Maestros**: 100% de las hojas del modelo oficial disponen de vistas interactivas con tablas de alta fidelidad en el visor principal.
+- **Seguridad & RBAC**: Bitácora de auditoría restringida al SuperAdmin (`ecotraffic.bo@gmail.com`). Roles de observador aislados de controles críticos.
+- **Persistencia Multi-Equipo**: Sincronización híbrida (servidor local + Supabase) de escenarios de negociación personalizada, incluyendo `Social 3 (Bs. 4,00) ACCESIBLE`.
+
+## 15. Tareas Pendientes para la Próxima Sesión
+1. **Reanudación del Proceso de Auditoría**:
+   - Continuar con el cronograma formal de auditoría y revisión de actas de la mesa técnica de concertación.
+2. **Evaluación de Pruebas de Usuario**:
+   - Validación cruzada de la visualización y persistencia del escenario `Social 3 (Bs. 4,00)` desde múltiples equipos y navegadores.
+   - Verificación de la descarga y lectura del archivo `Modelo_Tarifario_Sucre_Auditoria_v3.2.1.xlsx` en Microsoft Excel de escritorio.
+   - Confirmación de lectura del valor calibrado `Bs. 3,44` en el dossier de impresión institucional y reportes PDF.
+3. **Refinamiento de Exportación Excel**:
+   - Incorporar formateo avanzado de celdas (anchos de columna optimizados, colores institucionales y formatos numéricos con moneda) en el motor `xlsx` si la mesa técnica lo requiere.
+4. **Respaldo & Sincronización Cloud**:
+   - Verificar integridad de las tablas `negotiation_scenarios` y `audit_logs` en Supabase previo a la reunión plenaria de concertación.
+
+

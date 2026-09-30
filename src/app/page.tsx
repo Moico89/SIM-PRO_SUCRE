@@ -31,11 +31,11 @@ const defaultParameters: SystemParameters = {
 };
 
 const defaultFares: FareCategory[] = [
-  { id: '1', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Adultos', demand_share: 0.58, daily_trips: 154030, fare_current_bs: 4.50, fare_technical_bs: 3.4485, fare_social_1_bs: 3.80, fare_social_2_bs: 3.50, sort_order: 1, created_at: '', updated_at: '' },
-  { id: '2', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Adultos mayores', demand_share: 0.07, daily_trips: 18590, fare_current_bs: 3.50, fare_technical_bs: 2.6822, fare_social_1_bs: 3.00, fare_social_2_bs: 2.50, sort_order: 2, created_at: '', updated_at: '' },
-  { id: '3', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Universitarios', demand_share: 0.18, daily_trips: 47802, fare_current_bs: 2.50, fare_technical_bs: 1.9158, fare_social_1_bs: 2.00, fare_social_2_bs: 2.00, sort_order: 3, created_at: '', updated_at: '' },
-  { id: '4', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Colegiales', demand_share: 0.10, daily_trips: 26557, fare_current_bs: 1.50, fare_technical_bs: 1.1495, fare_social_1_bs: 1.50, fare_social_2_bs: 1.50, sort_order: 4, created_at: '', updated_at: '' },
-  { id: '5', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Escolares', demand_share: 0.05, daily_trips: 13278, fare_current_bs: 1.00, fare_technical_bs: 0.7663, fare_social_1_bs: 1.00, fare_social_2_bs: 1.50, sort_order: 5, created_at: '', updated_at: '' },
+  { id: '1', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Adultos', demand_share: 0.58, daily_trips: 154030, fare_current_bs: 4.50, fare_technical_bs: 3.4431, fare_social_1_bs: 3.80, fare_social_2_bs: 3.50, sort_order: 1, created_at: '', updated_at: '' },
+  { id: '2', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Adultos mayores', demand_share: 0.07, daily_trips: 18590, fare_current_bs: 3.50, fare_technical_bs: 2.6780, fare_social_1_bs: 3.00, fare_social_2_bs: 2.50, sort_order: 2, created_at: '', updated_at: '' },
+  { id: '3', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Universitarios', demand_share: 0.18, daily_trips: 47802, fare_current_bs: 2.50, fare_technical_bs: 1.9128, fare_social_1_bs: 2.00, fare_social_2_bs: 2.00, sort_order: 3, created_at: '', updated_at: '' },
+  { id: '4', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Colegiales', demand_share: 0.10, daily_trips: 26557, fare_current_bs: 1.50, fare_technical_bs: 1.1477, fare_social_1_bs: 1.50, fare_social_2_bs: 1.50, sort_order: 4, created_at: '', updated_at: '' },
+  { id: '5', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Escolares', demand_share: 0.05, daily_trips: 13278, fare_current_bs: 1.00, fare_technical_bs: 0.7651, fare_social_1_bs: 1.00, fare_social_2_bs: 1.50, sort_order: 5, created_at: '', updated_at: '' },
   { id: '6', session_id: 'a0000000-0000-0000-0000-000000000001', name: 'Discapacidad / menores de 5', demand_share: 0.02, daily_trips: 5311, fare_current_bs: 0.00, fare_technical_bs: 0.0000, fare_social_1_bs: 0.00, fare_social_2_bs: 0.00, sort_order: 6, created_at: '', updated_at: '' }
 ];
 
@@ -70,12 +70,17 @@ const defaultLogs: AuditLog[] = [
   }
 ];
 
-export default function HomePage() {
+import { getSharedScenarios } from '@/actions/scenarios';
+
+export default async function HomePage() {
+  const initialScenarios = await getSharedScenarios();
+
   return (
     <DashboardView 
       initialParameters={defaultParameters}
       initialFares={defaultFares}
       initialLogs={defaultLogs}
+      initialScenarios={initialScenarios}
       currentRole="consultor_ecotraffic"
       currentUserEmail="consultor@ecotraffic.com.bo"
     />
