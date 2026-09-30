@@ -42,7 +42,7 @@
   - `tenant-sindicato-san-cristobal`: Sindicato de Choferes San Cristóbal.
   - `tenant-sindicato-sucre`: Sindicato de Micros y Colectivos Sucre.
 - **Motor de Autenticación Zero-Trust & Creación de Usuarios**:
-  - SuperAdmin exclusivo para `ecotraffic.bo@gmail.com` con validación estricta de contraseña (`Sucre2026*` o credencial registrada).
+  - SuperAdmin exclusivo para `ecotraffic.bo@gmail.com` con validación estricta de credencial registrada.
   - Cualquier usuario público o correo no registrado que inicie sesión obtiene estrictamente el rol `observador_publico` (Solo Lectura, sin permisos de edición ni panel SuperAdmin).
   - Administradores Nivel 1 (`admin_municipal`, `consultor_ecotraffic`, etc.) deben ser creados y autorizados explícitamente desde el Panel de Gestión por el SuperAdmin.
   - Persistencia de sesión bidireccional (`tarfy_session`, `simpro_custom_credentials`, `simpro_directory_users`) con auditoría de cada inicio de sesión.
