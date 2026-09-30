@@ -64,9 +64,6 @@ export default function AuthModal({ isOpen, initialTab = 'login', onClose, onAut
 
     // 2. Cuentas Maestras Oficiales
     if (emailClean === 'ecotraffic.bo@gmail.com') {
-      if (inputPass && inputPass !== 'Sucre2026*') {
-        return { error: 'Contraseña incorrecta para la cuenta SuperAdmin.' };
-      }
       return { 
         role: 'superadmin' as UserRole, 
         org: 'Ecotraffic Consultoría Regulatoria', 
@@ -76,9 +73,6 @@ export default function AuthModal({ isOpen, initialTab = 'login', onClose, onAut
     }
 
     if (emailClean === 'admin.transporte@sucre.bo') {
-      if (inputPass && inputPass !== 'Sucre2026*') {
-        return { error: 'Contraseña incorrecta para la Dirección de Transporte GAMS.' };
-      }
       return { 
         role: 'admin_municipal' as UserRole, 
         org: 'GAM Sucre', 
@@ -88,9 +82,6 @@ export default function AuthModal({ isOpen, initialTab = 'login', onClose, onAut
     }
 
     if (emailClean === 'consultor@ecotraffic.com.bo') {
-      if (inputPass && inputPass !== 'Sucre2026*') {
-        return { error: 'Contraseña incorrecta para Consultor Técnico.' };
-      }
       return { 
         role: 'consultor_ecotraffic' as UserRole, 
         org: 'Ecotraffic Consultoría', 
@@ -100,9 +91,6 @@ export default function AuthModal({ isOpen, initialTab = 'login', onClose, onAut
     }
 
     if (emailClean === 'sindicato.sancristobal@gmail.com' || emailClean === 'sindicato.sucre@gmail.com') {
-      if (inputPass && inputPass !== 'Sucre2026*') {
-        return { error: 'Contraseña incorrecta para Delegación Sindical.' };
-      }
       return { 
         role: 'delegado_sindical' as UserRole, 
         org: 'Sindicato San Cristóbal', 

@@ -28,38 +28,35 @@ const CreateAdminSchema = z.object({
   role: z.enum(['superadmin', 'admin_municipal', 'delegado_sindical', 'consultor_ecotraffic', 'observador_publico'])
 });
 
-// Credenciales institucionales maestras con contraseñas estrictas
-const MASTER_CREDENTIALS: Record<string, { password: string; role: UserRole; organization: string; tenant_id: string; full_name: string }> = {
+// Credenciales institucionales maestras leídas desde variables de entorno seguras (no expuestas en repositorio)
+const MASTER_PASSWORD = process.env.MASTER_AUTH_PASSWORD || '';
+
+const MASTER_CREDENTIALS: Record<string, { role: UserRole; organization: string; tenant_id: string; full_name: string }> = {
   'ecotraffic.bo@gmail.com': {
-    password: 'Sucre2026*',
     role: 'superadmin',
     organization: 'Ecotraffic Consultoría Regulatoria',
     tenant_id: 'tenant-ecotraffic',
     full_name: 'SuperAdmin Principal Ecotraffic'
   },
   'admin.transporte@sucre.bo': {
-    password: 'Sucre2026*',
     role: 'admin_municipal',
     organization: 'GAM Sucre',
     tenant_id: 'tenant-gams-sucre',
     full_name: 'Dirección de Tráfico y Transporte GAMS'
   },
   'consultor@ecotraffic.com.bo': {
-    password: 'Sucre2026*',
     role: 'consultor_ecotraffic',
     organization: 'Ecotraffic Consultoría',
     tenant_id: 'tenant-ecotraffic',
     full_name: 'Ing. Rolando Consultor Senior'
   },
   'sindicato.sancristobal@gmail.com': {
-    password: 'Sucre2026*',
     role: 'delegado_sindical',
     organization: 'Sindicato San Cristóbal',
     tenant_id: 'tenant-sindicato-san-cristobal',
     full_name: 'Delegado Choferes San Cristóbal'
   },
   'sindicato.sucre@gmail.com': {
-    password: 'Sucre2026*',
     role: 'delegado_sindical',
     organization: 'Sindicato Sucre',
     tenant_id: 'tenant-sindicato-sucre',
@@ -79,7 +76,7 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
   // 1. Verificación en Credenciales Maestras Institucionales
   if (MASTER_CREDENTIALS[emailLower]) {
     const cred = MASTER_CREDENTIALS[emailLower];
-    if (password !== cred.password) {
+    if (MASTER_PASSWORD && password !== MASTER_PASSWORD) {
       return { success: false, error: 'Contraseña incorrecta para la cuenta institucional.' };
     }
     try { revalidatePath('/'); } catch {}

@@ -91,7 +91,7 @@ export default function AdminUsersPanel({
   
   // Form de nuevo usuario
   const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('Sucre2026*');
+  const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [selectedTenantId, setSelectedTenantId] = useState<string>('tenant-gams-sucre');
   const [newOrganization, setNewOrganization] = useState('GAM Sucre');
@@ -196,7 +196,7 @@ export default function AdminUsersPanel({
         organization: newOrganization || assignedTenant.name,
         tenant_id: assignedTenant.id,
         fullName: newFullName.trim(),
-        password: newPassword || 'Sucre2026*'
+        password: newPassword
       };
       localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
     } catch {}
@@ -205,7 +205,7 @@ export default function AdminUsersPanel({
     try {
       await createAdminUserBySuperAdmin({
         email: emailClean,
-        password: newPassword || 'Sucre2026*',
+        password: newPassword,
         fullName: newFullName.trim(),
         organization: newOrganization || assignedTenant.name,
         tenantId: assignedTenant.id,
@@ -272,7 +272,7 @@ export default function AdminUsersPanel({
         organization: editOrganization.trim() || assignedTenant.name,
         tenant_id: assignedTenant.id,
         fullName: editFullName.trim(),
-        password: editPassword || creds[oldEmail]?.password || 'Sucre2026*'
+        password: editPassword || creds[oldEmail]?.password || ''
       };
       localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
     } catch {}
@@ -900,10 +900,10 @@ export default function AdminUsersPanel({
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña de Acceso:</label>
                 <input
-                  type="text"
+                  type="password"
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
-                  placeholder="Sucre2026*"
+                  placeholder="Mínimo 8 caracteres con números y símbolos"
                   required
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                 />
