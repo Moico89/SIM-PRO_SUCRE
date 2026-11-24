@@ -4,8 +4,7 @@
 -- Ejecutable en PostgreSQL 15+ / Supabase
 -- ============================================================================
 
-\set ON_ERROR_STOP off
-\echo '--- INICIANDO SUITE DE PRUEBAS DE SEGURIDAD AUD-002 ---'
+
 
 -- PREPARACIÓN: Crear usuarios de prueba con roles específicos
 DO $$
@@ -33,7 +32,7 @@ END $$;
 -- PRUEBA 1: UPDATE sobre audit_logs como 'authenticated'
 -- Esperado: Falla (Trigger trg_audit_logs_no_update_delete o REVOKE)
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 1: UPDATE sobre audit_logs como authenticated'
+-- >>> PRUEBA 1: UPDATE sobre audit_logs como authenticated
 SET ROLE authenticated;
 SET request.jwt.claims TO '{"sub": "00000000-0000-0000-0000-000000000093", "role": "authenticated"}';
 
@@ -45,7 +44,7 @@ WHERE id = (SELECT id FROM public.audit_logs LIMIT 1);
 -- PRUEBA 2: DELETE sobre audit_logs como 'service_role'
 -- Esperado: Falla (Trigger trg_audit_logs_no_update_delete o REVOKE)
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 2: DELETE sobre audit_logs como service_role'
+-- >>> PRUEBA 2: DELETE sobre audit_logs como service_role
 SET ROLE service_role;
 
 DELETE FROM public.audit_logs WHERE id = (SELECT id FROM public.audit_logs LIMIT 1);
@@ -54,7 +53,7 @@ DELETE FROM public.audit_logs WHERE id = (SELECT id FROM public.audit_logs LIMIT
 -- PRUEBA 3: TRUNCATE sobre audit_logs
 -- Esperado: Falla (Trigger trg_audit_logs_no_truncate o REVOKE)
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 3: TRUNCATE sobre audit_logs'
+-- >>> PRUEBA 3: TRUNCATE sobre audit_logs
 SET ROLE postgres;
 
 TRUNCATE TABLE public.audit_logs;
@@ -63,7 +62,7 @@ TRUNCATE TABLE public.audit_logs;
 -- PRUEBA 4: INSERT con justificación corta (< 15 caracteres) o nula
 -- Esperado: Falla por restricción CHECK (chk_audit_justification_min_len)
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 4: INSERT con justificación insuficiente (< 15 caracteres)'
+-- >>> PRUEBA 4: INSERT con justificación insuficiente (< 15 caracteres)
 SET ROLE postgres;
 
 INSERT INTO public.audit_logs (
@@ -78,7 +77,7 @@ INSERT INTO public.audit_logs (
 -- PRUEBA 5: Inserciones consecutivas y validación de hash chain
 -- Esperado: La cadena se enlaza perfectamente (prev_hash -> row_hash) sin bifurcación
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 5: Inserciones consecutivas y verificación de integridad criptográfica'
+-- >>> PRUEBA 5: Inserciones consecutivas y verificación de integridad criptográfica
 SET ROLE postgres;
 
 SELECT public.log_audit_event(
@@ -109,7 +108,7 @@ SELECT * FROM public.verify_audit_chain();
 -- PRUEBA 6: Simulación de alteración maliciosa y detección por verify_audit_chain()
 -- Esperado: verify_audit_chain() devuelve 'CORRUPTED_ROW_HASH' con el id alterado
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 6: Detección de alteración manual forzada'
+-- >>> PRUEBA 6: Detección de alteración manual forzada
 -- Deshabilitar trigger temporalmente SOLO en sesión de prueba
 ALTER TABLE public.audit_logs DISABLE TRIGGER trg_audit_logs_no_update_delete;
 
@@ -128,7 +127,7 @@ ALTER TABLE public.audit_logs ENABLE TRIGGER trg_audit_logs_no_update_delete;
 -- PRUEBA 7: observador_publico hace SELECT directo sobre tabla audit_logs
 -- Esperado: Sin acceso / 0 filas visibles por política RLS
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 7: SELECT sobre audit_logs por observador_publico'
+-- >>> PRUEBA 7: SELECT sobre audit_logs por observador_publico
 SET ROLE authenticated;
 SET request.jwt.claims TO '{"sub": "00000000-0000-0000-0000-000000000091", "role": "authenticated"}';
 
@@ -141,7 +140,7 @@ SELECT count(*) AS metricas_publicas_observador FROM public.vw_observador_metric
 -- PRUEBA 8: delegado_sindical intenta modificar parámetros oficiales
 -- Esperado: 0 filas actualizadas / Falla por política RLS
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 8: UPDATE de parámetros por delegado_sindical'
+-- >>> PRUEBA 8: UPDATE de parámetros por delegado_sindical
 SET ROLE authenticated;
 SET request.jwt.claims TO '{"sub": "00000000-0000-0000-0000-000000000092", "role": "authenticated"}';
 
@@ -153,7 +152,7 @@ WHERE session_id = 'a0000000-0000-0000-0000-000000000001';
 -- PRUEBA 9: Cliente anónimo o sin privilegios intenta INSERT directo en audit_logs
 -- Esperado: Falla por REVOKE INSERT ON public.audit_logs FROM anon, public
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 9: INSERT directo de cliente no autorizado'
+-- >>> PRUEBA 9: INSERT directo de cliente no autorizado
 SET ROLE anon;
 
 INSERT INTO public.audit_logs (
@@ -168,7 +167,7 @@ INSERT INTO public.audit_logs (
 -- PRUEBA 10: Acción del SuperAdmin sobre un parámetro
 -- Esperado: Actualización permitida y evento registrado en audit_logs
 -- ----------------------------------------------------------------------------
-\echo '>>> PRUEBA 10: Acción de SuperAdmin auditada'
+-- >>> PRUEBA 10: Acción de SuperAdmin auditada
 SET ROLE authenticated;
 SET request.jwt.claims TO '{"sub": "00000000-0000-0000-0000-000000000093", "role": "authenticated"}';
 
@@ -190,4 +189,4 @@ SELECT public.log_audit_event(
 );
 
 RESET ROLE;
-\echo '--- SUITE DE PRUEBAS AUD-002 COMPLETADA ---'
+-- --- SUITE DE PRUEBAS AUD-002 COMPLETADA ---

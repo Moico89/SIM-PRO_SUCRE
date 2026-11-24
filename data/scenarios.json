@@ -1,0 +1,38 @@
+[
+  {
+    "id": "custom-1791513945569",
+    "label": "SOCIAL 1 (Bs. 4,00)",
+    "badge": "VIGENTE D.M. 048/2026",
+    "adultFare": 4,
+    "socialFares": {
+      "adultos": 4,
+      "adultosMayores": 3,
+      "universitarios": 2,
+      "colegiales": 1,
+      "escolares": 1,
+      "discapacidad": 0
+    },
+    "demandFactor": 1,
+    "fuelPriceFactor": 1,
+    "isCustom": true,
+    "color": "text-indigo-700 font-extrabold"
+  },
+  {
+    "id": "custom-1795551393794",
+    "label": "Propuesta Tarifaria Personalizada",
+    "badge": "NUEVO",
+    "adultFare": 4,
+    "socialFares": {
+      "adultos": 4,
+      "adultosMayores": 2.5,
+      "universitarios": 2.5,
+      "colegiales": 1.5,
+      "escolares": 1.5,
+      "discapacidad": 0
+    },
+    "demandFactor": 1,
+    "fuelPriceFactor": 1,
+    "isCustom": true,
+    "color": "text-indigo-700 font-extrabold"
+  }
+]

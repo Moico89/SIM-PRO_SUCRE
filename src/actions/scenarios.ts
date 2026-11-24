@@ -38,16 +38,36 @@ function writeServerFileScenarios(scenarios: ScenarioConfig[]) {
 export async function getSharedScenarios(): Promise<ScenarioConfig[]> {
   const customFromFile = readServerFileScenarios();
   
-  // Intentar leer también de Supabase si está disponible
+  // Intentar leer también de Supabase si está disponible (con timeout rápido de 1.5s)
   let customFromDb: ScenarioConfig[] = [];
   try {
     const supabase = createClient();
-    const { data } = await supabase.from('negotiation_scenarios').select('*');
+    const { data } = await Promise.race([
+      Promise.resolve(supabase.from('negotiation_scenarios').select('*')),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 1500)),
+    ]);
     if (data && data.length > 0) {
-      customFromDb = data.map((d: any) => ({
+      interface DbScenarioRow {
+        id: string;
+        label: string;
+        badge?: string;
+        adult_fare: number | string;
+        social_fares?: {
+          adultos: number;
+          adultosMayores: number;
+          universitarios: number;
+          colegiales: number;
+          escolares: number;
+          discapacidad: number;
+        };
+        demand_factor?: number | string;
+        fuel_price_factor?: number | string;
+        color?: string;
+      }
+      customFromDb = (data as unknown as DbScenarioRow[]).map((d) => ({
         id: d.id,
         label: d.label,
-        badge: d.badge,
+        badge: d.badge || '',
         adultFare: Number(d.adult_fare),
         socialFares: d.social_fares || {
           adultos: Number(d.adult_fare),

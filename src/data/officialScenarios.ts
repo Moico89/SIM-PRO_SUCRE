@@ -1,45 +1,35 @@
 import type { ScenarioConfig } from '@/types/scenario';
 
-// Escenarios oficiales del sistema predefinidos (incluyendo Social 3 creado en concertación)
+// Escenarios oficiales del sistema calibrados a Diésel Bs. 20,57/l (D.S. 5716 / ANH)
 export const OFFICIAL_SCENARIOS: ScenarioConfig[] = [
   {
-    id: 'social2',
-    label: 'Social 2 (Bs. 3,50)',
+    id: 'social1',
+    label: 'Social 1 (Bs. 4,00)',
     badge: 'RECOMENDADO',
-    adultFare: 3.50,
-    socialFares: { adultos: 3.50, adultosMayores: 2.50, universitarios: 2.00, colegiales: 1.50, escolares: 1.50, discapacidad: 0 },
+    adultFare: 4.00,
+    socialFares: { adultos: 4.00, adultosMayores: 3.00, universitarios: 2.00, colegiales: 1.00, escolares: 1.00, discapacidad: 0 },
     demandFactor: 1.0,
     fuelPriceFactor: 1.0,
     color: 'text-emerald-700 font-extrabold',
     isCustom: false
   },
   {
-    id: 'social3',
-    label: 'Social 3 (Bs. 4,00)',
-    badge: 'ACCESIBLE',
-    adultFare: 4.00,
-    socialFares: { adultos: 4.00, adultosMayores: 3.00, universitarios: 2.00, colegiales: 1.00, escolares: 1.00, discapacidad: 0 },
+    id: 'social2',
+    label: 'Social 2 (Bs. 3,50)',
+    badge: 'DÉFICIT',
+    adultFare: 3.50,
+    socialFares: { adultos: 3.50, adultosMayores: 2.50, universitarios: 2.00, colegiales: 1.50, escolares: 1.50, discapacidad: 0 },
     demandFactor: 1.0,
     fuelPriceFactor: 1.0,
-    color: 'text-emerald-800 font-bold',
-    isCustom: false
-  },
-  {
-    id: 'social1',
-    label: 'Social 1 (Bs. 3,80)',
-    adultFare: 3.80,
-    socialFares: { adultos: 3.80, adultosMayores: 3.00, universitarios: 2.00, colegiales: 1.50, escolares: 1.00, discapacidad: 0 },
-    demandFactor: 1.0,
-    fuelPriceFactor: 1.0,
-    color: 'text-slate-700',
+    color: 'text-rose-700 font-extrabold',
     isCustom: false
   },
   {
     id: 'technical',
-    label: 'Técnica (Bs. 3,44)',
+    label: 'Técnica (Bs. 3,66)',
     badge: 'EQUILIBRIO',
-    adultFare: 3.4431,
-    socialFares: { adultos: 3.4431, adultosMayores: 2.6780, universitarios: 1.9128, colegiales: 1.1477, escolares: 0.7651, discapacidad: 0 },
+    adultFare: 3.6615,
+    socialFares: { adultos: 3.6615, adultosMayores: 2.8479, universitarios: 2.0342, colegiales: 1.2205, escolares: 0.8137, discapacidad: 0 },
     demandFactor: 1.0,
     fuelPriceFactor: 1.0,
     color: 'text-blue-700',

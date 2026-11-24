@@ -1,4 +1,16 @@
-import type { Tenant } from '@/types/database';
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  short_name: string;
+  city: string;
+  country: string;
+  badge: string;
+  is_active: boolean;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export const OFFICIAL_TENANTS: Tenant[] = [
   {

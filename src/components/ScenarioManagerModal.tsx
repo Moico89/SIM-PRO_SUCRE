@@ -8,6 +8,7 @@ interface ScenarioManagerModalProps {
   onClose: () => void;
   scenarios: ScenarioConfig[];
   activeScenarioId: string;
+  baseFuelPrice?: number;
   onSaveScenario: (scenario: ScenarioConfig) => void;
   onDeleteScenario: (scenarioId: string) => void;
   onSelectScenario: (scenarioId: string) => void;
@@ -18,6 +19,7 @@ export default function ScenarioManagerModal({
   onClose,
   scenarios,
   activeScenarioId,
+  baseFuelPrice = 20.57,
   onSaveScenario,
   onDeleteScenario,
   onSelectScenario
@@ -100,7 +102,9 @@ export default function ScenarioManagerModal({
         <div className="bg-slate-950 text-white p-5 flex justify-between items-center border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-md">
-              ⚡
+              <svg className="w-5 h-5 text-indigo-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
             </div>
             <div>
               <h2 className="text-base font-black tracking-tight">Gestor de Escenarios Tarifarios</h2>
@@ -353,7 +357,7 @@ export default function ScenarioManagerModal({
                     onChange={e => setFuelPriceFactor(Number(e.target.value))}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-semibold"
                   >
-                    <option value={1.0}>100% (Precio Base Bs. 17.95)</option>
+                    <option value={1.0}>100% (Precio Base Bs. {baseFuelPrice.toFixed(2)})</option>
                     <option value={1.15}>115% (+15% Incremento)</option>
                     <option value={1.25}>125% (+25% Estrés)</option>
                   </select>

@@ -26,7 +26,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
     <div className="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-cyan-500 selection:text-white min-h-screen flex flex-col scroll-smooth">
       
       {/* ========================================================================= */}
-      {/* 🧭 1. MAIN HEADER (Sticky con fondo blanco/blur institucional)            */}
+      {/* 1. MAIN HEADER (Sticky con fondo blanco/blur institucional)               */}
       {/* ========================================================================= */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs" data-purpose="site-navigation">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -114,7 +114,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </header>
 
       {/* ========================================================================= */}
-      {/* 🚀 2. HERO SECTION CON PORTADA ANIMADA & CONSOLA EN VIVO                  */}
+      {/* 2. HERO SECTION CON PORTADA ANIMADA & CONSOLA EN VIVO                     */}
       {/* ========================================================================= */}
       <section 
         className="relative bg-[#070f26] hero-glow text-white pt-16 pb-28 lg:pb-36 overflow-hidden" 
@@ -299,7 +299,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 💳 3. HERO FEATURE CARDS (4 Tarjetas Blancas Flotantes con Solapamiento)  */}
+      {/* 3. HERO FEATURE CARDS (4 Tarjetas Blancas Flotantes con Solapamiento)     */}
       {/* ========================================================================= */}
       <section className="relative z-20 -mt-16 sm:-mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" data-purpose="core-feature-cards">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -376,7 +376,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 📊 4. INTERACTIVE DASHBOARD SECTION (Showcase con Ventana de Telemetría)  */}
+      {/* 4. INTERACTIVE DASHBOARD SECTION (Showcase con Ventana de Telemetría)     */}
       {/* ========================================================================= */}
       <section className="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" data-purpose="dashboard-showcase" id="caracteristicas">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -614,7 +614,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 🏛️ 5. INSTITUTIONAL BENEFITS SECTION                                      */}
+      {/* 5. INSTITUTIONAL BENEFITS SECTION                                         */}
       {/* ========================================================================= */}
       <section className="py-20 bg-slate-100/70 border-y border-slate-200" data-purpose="institutional-benefits">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -684,7 +684,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 🌟 6. SUCCESS CASES SECTION (Casos de Éxito)                              */}
+      {/* 6. SUCCESS CASES SECTION (Casos de Éxito)                                 */}
       {/* ========================================================================= */}
       <section className="py-20 bg-white" data-purpose="success-cases-and-clients" id="casos">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -750,7 +750,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 💰 7. PRICING PLANS SECTION (Planes y Precios)                            */}
+      {/* 7. PRICING PLANS SECTION (Planes y Precios)                               */}
       {/* ========================================================================= */}
       <section className="py-24 bg-slate-50 border-t border-slate-200" data-purpose="pricing-tiers" id="precios">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -888,7 +888,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 📰 8. FEATURED BLOG SECTION (Publicaciones & Análisis)                    */}
+      {/* 8. FEATURED BLOG SECTION (Publicaciones & Análisis)                       */}
       {/* ========================================================================= */}
       <section className="py-24 bg-white" data-purpose="institutional-blog" id="blog">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1000,7 +1000,7 @@ export default function LandingPage({ onOpenLogin, onOpenDemo }: LandingPageProp
       </section>
 
       {/* ========================================================================= */}
-      {/* 🏢 9. INSTITUTIONAL FOOTER (Pie de Página Corporativo)                    */}
+      {/* 9. INSTITUTIONAL FOOTER (Pie de Página Corporativo)                       */}
       {/* ========================================================================= */}
       <footer className="bg-[#0b1329] text-slate-400 pt-16 pb-12 border-t border-slate-800" data-purpose="site-footer" id="contacto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

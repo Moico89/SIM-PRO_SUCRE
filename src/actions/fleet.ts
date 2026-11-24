@@ -1,0 +1,85 @@
+'use server';
+
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+export async function getFuelTypes() {
+  const { data, error } = await supabase.from('fuel_types').select('*').order('name');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getTransportModes(organizationId: string) {
+  const { data, error } = await supabase
+    .from('transport_modes')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .order('name');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getVehicleTypes(organizationId: string) {
+  const { data, error } = await supabase
+    .from('vehicle_types')
+    .select(`
+      *,
+      transport_modes (name),
+      fuel_types (name, unit)
+    `)
+    .eq('organization_id', organizationId)
+    .order('brand');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+import { VehicleType } from '@/types/database';
+
+export async function createVehicleType(vehicleData: Omit<VehicleType, 'id' | 'created_at' | 'updated_at'>) {
+  const { data, error } = await supabase
+    .from('vehicle_types')
+    .insert([vehicleData])
+    .select()
+    .single();
+  
+  if (error) throw new Error(error.message);
+  return data as VehicleType;
+}
+
+export async function updateVehicleType(id: string, vehicleData: Partial<Omit<VehicleType, 'id' | 'created_at' | 'updated_at'>>) {
+  const { data, error } = await supabase
+    .from('vehicle_types')
+    .update(vehicleData)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw new Error(error.message);
+  return data as VehicleType;
+}
+
+export async function toggleVehicleActive(id: string, is_active: boolean) {
+  const { data, error } = await supabase
+    .from('vehicle_types')
+    .update({ is_active })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteVehicleType(id: string) {
+  const { error } = await supabase
+    .from('vehicle_types')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw new Error(error.message);
+  return true;
+}
