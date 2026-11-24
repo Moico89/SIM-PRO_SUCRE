@@ -2,13 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 export async function getTemplatesByOrg(orgId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('maintenance_templates')
     .select(`
       *,
@@ -23,7 +24,7 @@ export async function getTemplatesByOrg(orgId: string) {
 }
 
 export async function getItemsByTemplate(templateId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('maintenance_items')
     .select('*')
     .eq('template_id', templateId)
@@ -37,7 +38,7 @@ export async function getItemsByTemplate(templateId: string) {
 import { MaintenanceTemplate, MaintenanceItem } from '@/types/database';
 
 export async function createTemplate(templateData: Omit<MaintenanceTemplate, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('maintenance_templates')
     .insert([templateData])
     .select()
@@ -51,7 +52,7 @@ export async function createTemplate(templateData: Omit<MaintenanceTemplate, 'id
 
 export async function saveMaintenanceItems(templateId: string, items: Omit<MaintenanceItem, 'id' | 'created_at'>[]) {
   // Para MVP borramos y re-insertamos (bulk replace)
-  const { error: delError } = await supabase
+  const { error: delError } = await getSupabase()
     .from('maintenance_items')
     .delete()
     .eq('template_id', templateId);
@@ -66,7 +67,7 @@ export async function saveMaintenanceItems(templateId: string, items: Omit<Maint
     sort_order: index
   }));
 
-  const { error: insError } = await supabase
+  const { error: insError } = await getSupabase()
     .from('maintenance_items')
     .insert(insertData);
   
@@ -75,7 +76,7 @@ export async function saveMaintenanceItems(templateId: string, items: Omit<Maint
 }
 
 export async function updateTemplateTotals(templateId: string, totals: { total_annual_cost: number, total_monthly_cost: number, variable_share: number, fixed_share: number }) {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('maintenance_templates')
     .update(totals)
     .eq('id', templateId);
@@ -83,7 +84,7 @@ export async function updateTemplateTotals(templateId: string, totals: { total_a
   if (error) throw new Error(error.message);
 
   // Sync to system parameters so Dashboard updates in real time via WebSockets
-  const { data: latestParam } = await supabase
+  const { data: latestParam } = await getSupabase()
     .from('system_parameters')
     .select('id, version')
     .order('updated_at', { ascending: false })
@@ -91,7 +92,7 @@ export async function updateTemplateTotals(templateId: string, totals: { total_a
     .single();
 
   if (latestParam) {
-    await supabase
+    await getSupabase()
       .from('system_parameters')
       .update({
         maintenance_monthly_bs: totals.total_monthly_cost,

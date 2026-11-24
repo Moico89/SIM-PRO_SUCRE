@@ -2,19 +2,20 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 export async function getFuelTypes() {
-  const { data, error } = await supabase.from('fuel_types').select('*').order('name');
+  const { data, error } = await getSupabase().from('fuel_types').select('*').order('name');
   if (error) throw new Error(error.message);
   return data;
 }
 
 export async function getTransportModes(organizationId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('transport_modes')
     .select('*')
     .eq('organization_id', organizationId)
@@ -24,7 +25,7 @@ export async function getTransportModes(organizationId: string) {
 }
 
 export async function getVehicleTypes(organizationId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('vehicle_types')
     .select(`
       *,
@@ -40,7 +41,7 @@ export async function getVehicleTypes(organizationId: string) {
 import { VehicleType } from '@/types/database';
 
 export async function createVehicleType(vehicleData: Omit<VehicleType, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('vehicle_types')
     .insert([vehicleData])
     .select()
@@ -51,7 +52,7 @@ export async function createVehicleType(vehicleData: Omit<VehicleType, 'id' | 'c
 }
 
 export async function updateVehicleType(id: string, vehicleData: Partial<Omit<VehicleType, 'id' | 'created_at' | 'updated_at'>>) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('vehicle_types')
     .update(vehicleData)
     .eq('id', id)
@@ -63,7 +64,7 @@ export async function updateVehicleType(id: string, vehicleData: Partial<Omit<Ve
 }
 
 export async function toggleVehicleActive(id: string, is_active: boolean) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('vehicle_types')
     .update({ is_active })
     .eq('id', id)
@@ -75,7 +76,7 @@ export async function toggleVehicleActive(id: string, is_active: boolean) {
 }
 
 export async function deleteVehicleType(id: string) {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('vehicle_types')
     .delete()
     .eq('id', id);
