@@ -743,6 +743,16 @@ export default function DashboardView({
               {isSuperAdmin && (
                 <div className="flex items-center gap-1.5 bg-slate-900/80 p-0.5 rounded-xl border border-slate-700/60">
                   <button
+                    onClick={() => setIsAdminPanelOpen(true)}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                    title="Abrir Panel SuperAdmin (Usuarios, Roles y Gobernanza)"
+                  >
+                    <svg className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
+                    </svg>
+                    <span>Panel SuperAdmin</span>
+                  </button>
+                  <button
                     onClick={() => window.location.href = '/admin/flota'}
                     className="hover:bg-amber-500/20 text-amber-300 text-[11px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
                     title="Catálogo de Flota Multimodal"

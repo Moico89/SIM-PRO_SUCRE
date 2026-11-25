@@ -9,33 +9,58 @@ function getSupabase() {
 }
 
 export async function getFuelTypes() {
-  const { data, error } = await getSupabase().from('fuel_types').select('*').order('name');
-  if (error) throw new Error(error.message);
-  return data;
+  try {
+    const { data, error } = await Promise.race([
+      Promise.resolve(getSupabase().from('fuel_types').select('*').order('name')),
+      new Promise<{ data: null; error: Error }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('TIMEOUT') }), 1500)),
+    ]);
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export async function getTransportModes(organizationId: string) {
-  const { data, error } = await getSupabase()
-    .from('transport_modes')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .order('name');
-  if (error) throw new Error(error.message);
-  return data;
+  try {
+    const { data, error } = await Promise.race([
+      Promise.resolve(
+        getSupabase()
+          .from('transport_modes')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('name')
+      ),
+      new Promise<{ data: null; error: Error }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('TIMEOUT') }), 1500)),
+    ]);
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export async function getVehicleTypes(organizationId: string) {
-  const { data, error } = await getSupabase()
-    .from('vehicle_types')
-    .select(`
-      *,
-      transport_modes (name),
-      fuel_types (name, unit)
-    `)
-    .eq('organization_id', organizationId)
-    .order('brand');
-  if (error) throw new Error(error.message);
-  return data;
+  try {
+    const { data, error } = await Promise.race([
+      Promise.resolve(
+        getSupabase()
+          .from('vehicle_types')
+          .select(`
+            *,
+            transport_modes (name),
+            fuel_types (name, unit)
+          `)
+          .eq('organization_id', organizationId)
+          .order('brand')
+      ),
+      new Promise<{ data: null; error: Error }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('TIMEOUT') }), 1500)),
+    ]);
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 import { VehicleType } from '@/types/database';

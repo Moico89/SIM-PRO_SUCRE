@@ -9,30 +9,46 @@ function getSupabase() {
 }
 
 export async function getTemplatesByOrg(orgId: string) {
-  const { data, error } = await getSupabase()
-    .from('maintenance_templates')
-    .select(`
-      *,
-      vehicle_types (
-        brand, model, capacity_seated, capacity_standing
-      )
-    `)
-    .eq('organization_id', orgId);
-  
-  if (error) throw new Error(error.message);
-  return data || [];
+  try {
+    const { data, error } = await Promise.race([
+      Promise.resolve(
+        getSupabase()
+          .from('maintenance_templates')
+          .select(`
+            *,
+            vehicle_types (
+              brand, model, capacity_seated, capacity_standing
+            )
+          `)
+          .eq('organization_id', orgId)
+      ),
+      new Promise<{ data: null; error: Error }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('TIMEOUT') }), 1500)),
+    ]);
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export async function getItemsByTemplate(templateId: string) {
-  const { data, error } = await getSupabase()
-    .from('maintenance_items')
-    .select('*')
-    .eq('template_id', templateId)
-    .order('category', { ascending: true })
-    .order('sort_order', { ascending: true });
-  
-  if (error) throw new Error(error.message);
-  return data || [];
+  try {
+    const { data, error } = await Promise.race([
+      Promise.resolve(
+        getSupabase()
+          .from('maintenance_items')
+          .select('*')
+          .eq('template_id', templateId)
+          .order('category', { ascending: true })
+          .order('sort_order', { ascending: true })
+      ),
+      new Promise<{ data: null; error: Error }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('TIMEOUT') }), 1500)),
+    ]);
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 import { MaintenanceTemplate, MaintenanceItem } from '@/types/database';
