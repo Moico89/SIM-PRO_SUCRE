@@ -50,7 +50,9 @@ export default function AuthModal({ isOpen, initialTab = 'login', onClose, onAut
     try {
       const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
       if (creds[emailClean]) {
-        if (inputPass && creds[emailClean].password && creds[emailClean].password !== inputPass) {
+        const storedPass = String(creds[emailClean].password || '').trim();
+        const enteredPass = String(inputPass || '').trim();
+        if (storedPass && enteredPass && storedPass !== enteredPass) {
           return { error: 'Contraseña incorrecta para el usuario registrado.' };
         }
         return { 

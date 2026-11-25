@@ -4,6 +4,35 @@ import { createClient } from '@/lib/supabase/server';
 import type { Profile, UserRole } from '@/types/database';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
+
+const USERS_FILE = path.join(process.cwd(), 'data', 'users.json');
+
+interface StoredAdminUser extends Profile {
+  password?: string;
+}
+
+function readStoredUsers(): StoredAdminUser[] {
+  try {
+    if (!fs.existsSync(USERS_FILE)) return [];
+    const raw = fs.readFileSync(USERS_FILE, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredUsers(users: StoredAdminUser[]) {
+  try {
+    const dir = path.dirname(USERS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
+  } catch {
+    // En entornos serverless de solo lectura (ej. Vercel) se ignora sin romper el flujo
+  }
+}
 
 const SignInSchema = z.object({
   email: z.string().email('Correo electrónico inválido'),
@@ -90,13 +119,35 @@ export async function loginUser(input: z.infer<typeof SignInSchema>) {
     };
   }
 
-  // 2. Intentar autenticación con Supabase Auth si está configurado
+  // 1.5. Verificación en usuarios autorizados por SuperAdmin (data/users.json)
+  const storedUsers = readStoredUsers();
+  const storedMatch = storedUsers.find(u => u.email.toLowerCase() === emailLower);
+  if (storedMatch) {
+    if (storedMatch.is_active === false) {
+      return { success: false, error: 'Cuenta desactivada por el SuperAdmin.' };
+    }
+    if (storedMatch.password && storedMatch.password.trim() !== password.trim()) {
+      return { success: false, error: 'Contraseña incorrecta para el usuario registrado.' };
+    }
+    return {
+      success: true,
+      user: { id: storedMatch.id, email: emailLower },
+      role: storedMatch.role,
+      organization: storedMatch.organization,
+      tenant_id: storedMatch.tenant_id || 'tenant-gams-sucre',
+      fullName: storedMatch.full_name,
+    };
+  }
+
+  // 2. Intentar autenticación con Supabase Auth si está configurado (fast-fail 1.5s)
   try {
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: emailLower,
-      password
-    });
+    const { data, error } = await Promise.race([
+      supabase.auth.signInWithPassword({ email: emailLower, password }),
+      new Promise<{ data: { user: null }; error: Error }>((resolve) =>
+        setTimeout(() => resolve({ data: { user: null }, error: new Error('SUPABASE_TIMEOUT') }), 1500)
+      ),
+    ]);
 
     if (!error && data?.user) {
       let role: UserRole = 'observador_publico';
@@ -307,7 +358,12 @@ export async function getAllUsers(): Promise<{ success: boolean; users?: Profile
     }
   ];
 
-  return { success: true, users: defaultDirectory };
+  const stored = readStoredUsers().map(({ password: _p, ...profile }) => profile as Profile);
+  const merged = new Map<string, Profile>();
+  defaultDirectory.forEach(u => merged.set(u.email.toLowerCase(), u));
+  stored.forEach(u => merged.set(u.email.toLowerCase(), u));
+
+  return { success: true, users: Array.from(merged.values()) };
 }
 
 export async function createAdminUserBySuperAdmin(input: z.infer<typeof CreateAdminSchema>) {
@@ -316,10 +372,29 @@ export async function createAdminUserBySuperAdmin(input: z.infer<typeof CreateAd
     return { success: false, error: validation.error.errors[0].message };
   }
 
-  const { email, fullName, organization, role, tenantId } = validation.data;
+  const { email, password, fullName, organization, role, tenantId } = validation.data;
+  const emailLower = email.toLowerCase().trim();
+  const now = new Date().toISOString();
+
+  const existing = readStoredUsers();
+  const filtered = existing.filter(u => u.email.toLowerCase() !== emailLower);
+  const newRecord: StoredAdminUser = {
+    id: `usr-${Date.now()}`,
+    tenant_id: tenantId || 'tenant-gams-sucre',
+    email: emailLower,
+    full_name: fullName.trim(),
+    organization: organization.trim(),
+    role,
+    is_active: true,
+    password: password.trim(),
+    created_at: now,
+    updated_at: now,
+  };
+  writeStoredUsers([newRecord, ...filtered]);
+
   return {
     success: true,
-    message: `Usuario ${role.toUpperCase()} '${fullName}' (${email}) creado y autorizado exitosamente en el sistema.`
+    message: `Usuario ${role.toUpperCase()} '${fullName}' (${emailLower}) creado y autorizado exitosamente en el sistema.`
   };
 }
 

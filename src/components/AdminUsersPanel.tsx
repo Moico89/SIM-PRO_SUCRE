@@ -96,6 +96,7 @@ export default function AdminUsersPanel({
   const [selectedTenantId, setSelectedTenantId] = useState<string>('tenant-gams-sucre');
   const [newOrganization, setNewOrganization] = useState('GAM Sucre');
   const [newRole, setNewRole] = useState<UserRole>('admin_municipal');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -189,6 +190,7 @@ export default function AdminUsersPanel({
     try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedList)); } catch {}
 
     // 2. Guardar credencial personalizada para autenticación directa
+    const cleanPass = newPassword.trim();
     try {
       const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
       creds[emailClean] = {
@@ -196,7 +198,7 @@ export default function AdminUsersPanel({
         organization: newOrganization || assignedTenant.name,
         tenant_id: assignedTenant.id,
         fullName: newFullName.trim(),
-        password: newPassword
+        password: cleanPass
       };
       localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
     } catch {}
@@ -205,7 +207,7 @@ export default function AdminUsersPanel({
     try {
       await createAdminUserBySuperAdmin({
         email: emailClean,
-        password: newPassword,
+        password: cleanPass,
         fullName: newFullName.trim(),
         organization: newOrganization || assignedTenant.name,
         tenantId: assignedTenant.id,
@@ -219,7 +221,9 @@ export default function AdminUsersPanel({
       type: 'success' 
     });
     setNewEmail('');
+    setNewPassword('');
     setNewFullName('');
+    setShowNewPassword(false);
     setActiveTab('list');
   };
 
@@ -262,8 +266,10 @@ export default function AdminUsersPanel({
     try { localStorage.setItem('simpro_directory_users', JSON.stringify(updatedUsers)); } catch {}
 
     // Actualizar en credenciales personalizadas
+    const cleanEditPass = editPassword.trim();
     try {
       const creds = JSON.parse(localStorage.getItem('simpro_custom_credentials') || '{}');
+      const prevPass = creds[oldEmail]?.password || creds[newEmailClean]?.password || '';
       if (oldEmail !== newEmailClean) {
         delete creds[oldEmail];
       }
@@ -272,7 +278,7 @@ export default function AdminUsersPanel({
         organization: editOrganization.trim() || assignedTenant.name,
         tenant_id: assignedTenant.id,
         fullName: editFullName.trim(),
-        password: editPassword || creds[oldEmail]?.password || ''
+        password: cleanEditPass || prevPass
       };
       localStorage.setItem('simpro_custom_credentials', JSON.stringify(creds));
     } catch {}
@@ -286,7 +292,7 @@ export default function AdminUsersPanel({
         organization: editOrganization.trim() || assignedTenant.name,
         role: editRole,
         tenantId: assignedTenant.id,
-        password: editPassword || undefined
+        password: cleanEditPass || undefined
       });
     } catch {}
 
@@ -899,14 +905,26 @@ export default function AdminUsersPanel({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña de Acceso:</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres con números y símbolos"
-                  required
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 8 caracteres con números y símbolos"
+                    required
+                    className="w-full p-2.5 pr-10 bg-white border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(v => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title={showNewPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={showNewPassword ? 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21' : 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'} />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <button
