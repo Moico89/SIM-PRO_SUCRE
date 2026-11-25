@@ -65,11 +65,11 @@ export default function AuthModal({ isOpen, initialTab = 'login', onClose, onAut
     } catch {}
 
     // 2. Cuentas Maestras Oficiales
-    if (emailClean === 'ecotraffic.bo@gmail.com') {
+    if (emailClean === 'ecotraffic.bo@gmail.com' || emailClean === 'rolandoparraga@gmail.com') {
       return { 
         role: 'superadmin' as UserRole, 
         org: 'Ecotraffic Consultoría Regulatoria', 
-        fullName: 'SuperAdmin Principal Ecotraffic', 
+        fullName: emailClean === 'rolandoparraga@gmail.com' ? 'Rolando Parraga' : 'SuperAdmin Principal Ecotraffic', 
         tenant_id: 'tenant-ecotraffic' 
       };
     }

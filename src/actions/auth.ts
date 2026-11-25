@@ -67,6 +67,12 @@ const MASTER_CREDENTIALS: Record<string, { role: UserRole; organization: string;
     tenant_id: 'tenant-ecotraffic',
     full_name: 'SuperAdmin Principal Ecotraffic'
   },
+  'rolandoparraga@gmail.com': {
+    role: 'superadmin',
+    organization: 'Ecotraffic Consultoría Regulatoria',
+    tenant_id: 'tenant-ecotraffic',
+    full_name: 'Rolando Parraga'
+  },
   'admin.transporte@sucre.bo': {
     role: 'admin_municipal',
     organization: 'GAM Sucre',
